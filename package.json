@@ -1,37 +1,113 @@
 {
-  "name": "orgpulse-init",
-  "version": "0.1.0",
+  "name": "orgpulse",
+  "version": "1.0.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "electron": "electron .",
+    "electron:build:mac": "electron-builder --mac --universal",
+    "electron:build:win": "electron-builder --win",
+    "electron:build:all": "electron-builder --mac --win --universal"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
     "@base-ui/react": "^1.3.0",
-    "@prisma/client": "^7.5.0",
+    "@hookform/resolvers": "^5.2.2",
+    "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.7.0",
+    "mammoth": "^1.12.0",
+    "marked": "^17.0.5",
     "next": "14.2.35",
-    "prisma": "^7.5.0",
+    "pdf-parse": "^2.4.5",
+    "prisma": "^5.22.0",
     "react": "^18",
     "react-dom": "^18",
+    "react-flow-renderer": "^10.3.17",
+    "react-hook-form": "^7.72.0",
+    "reactflow": "^11.11.4",
+    "resend": "^6.9.4",
     "shadcn": "^4.1.0",
     "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "unzipper": "^0.12.3",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/unzipper": "^0.10.11",
+    "electron": "^41.0.4",
+    "electron-builder": "^26.8.1",
+    "electron-updater": "^6.8.3",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
+  },
+  "build": {
+    "appId": "ai.orgpulse.app",
+    "productName": "OrgPulse",
+    "files": [
+      "electron/**/*",
+      "public/icons/**/*",
+      "node_modules/electron-updater/**/*"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_ORG",
+      "repo": "orgpulse"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "category": "public.app-category.business",
+      "icon": "public/icons/icon-512.png",
+      "artifactName": "OrgPulse-${version}-universal.dmg"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icons/icon-512.png",
+      "artifactName": "OrgPulse-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
+    "dmg": {
+      "title": "Install OrgPulse",
+      "background": null,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        { "x": 140, "y": 190, "type": "file" },
+        { "x": 400, "y": 190, "type": "link", "path": "/Applications" }
+      ]
+    }
   }
 }

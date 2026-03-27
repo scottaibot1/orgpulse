@@ -1,0 +1,26 @@
+{
+  "name": "OrgPulse AI",
+  "short_name": "OrgPulse",
+  "description": "AI-powered organizational reporting and intelligence platform",
+  "start_url": "/workspaces",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "productivity"]
+}

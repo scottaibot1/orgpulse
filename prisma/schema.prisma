@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// Organization (= Workspace)
+// ─────────────────────────────────────────────
+model Organization {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  ownerEmail String   @map("owner_email")
+  createdAt  DateTime @default(now()) @map("created_at")
+  settings   Json     @default("{}")
+
+  workspaceSettings WorkspaceSettings?
+  departments       Department[]
+  users             User[]
+  alerts            Alert[]
+  emailDrafts       EmailDraft[]
+  dailySummaries    DailySummary[]
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────
+// WorkspaceSettings
+// ─────────────────────────────────────────────
+model WorkspaceSettings {
+  id                    String   @id @default(cuid())
+  orgId                 String   @unique @map("org_id")
+  cronSchedule          String   @default("0 18 * * *") @map("cron_schedule")
+  cronTimezone          String   @default("America/New_York") @map("cron_timezone")
+  reportCadence         String   @default("daily") @map("report_cadence")
+  aiParameters          Json     @default("{}") @map("ai_parameters")
+  submissionMethods     Json     @default("[{\"type\":\"link\",\"active\":true},{\"type\":\"email\",\"active\":false},{\"type\":\"app\",\"active\":false}]") @map("submission_methods")
+  accentColor           String   @default("#6366f1") @map("accent_color")
+  reportCollectionScope String   @default("everyone") @map("report_collection_scope")
+  anthropicApiKey       String?  @map("anthropic_api_key")
+  description           String?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("workspace_settings")
+}
+
+// ─────────────────────────────────────────────
+// Department
+// ─────────────────────────────────────────────
+model Department {
+  id                 String    @id @default(cuid())
+  orgId              String    @map("org_id")
+  parentDepartmentId String?   @map("parent_department_id")
+  name               String
+  description        String?
+  headUserId         String?   @map("head_user_id")
+  color              String?
+  sortOrder          Int       @default(0) @map("sort_order")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  archivedAt         DateTime? @map("archived_at")
+
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  parent         Department?  @relation("SubDepartments", fields: [parentDepartmentId], references: [id])
+  subDepartments Department[] @relation("SubDepartments")
+  headUser       User?        @relation("DepartmentHead", fields: [headUserId], references: [id])
+  members        DepartmentMember[]
+  levelConfigs   DepartmentLevelConfig[]
+  reportsTo      ReportsTo[]
+
+  @@map("departments")
+}
+
+// ─────────────────────────────────────────────
+// User
+// ─────────────────────────────────────────────
+model User {
+  id              String   @id @default(cuid())
+  orgId           String   @map("org_id")
+  email           String
+  name            String
+  title           String?
+  role            UserRole @default(member)
+  level               Int?
+  isLead              Boolean  @default(false) @map("is_lead")
+  isReportingActive   Boolean  @default(true) @map("is_reporting_active")
+  submissionToken     String   @unique @map("submission_token") @default(cuid())
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  departmentMemberships DepartmentMember[]
+  headOfDepartments     Department[]       @relation("DepartmentHead")
+  reports               Report[]
+  parsedReports         ParsedReport[]
+  tasks                 Task[]
+  canonicalTasks        CanonicalTask[]
+  alerts                Alert[]
+  emailDraftsCreated    EmailDraft[]       @relation("EmailDraftCreator")
+  emailDraftsReceived   EmailDraft[]       @relation("EmailDraftRecipient")
+  reportsToManagers     ReportsTo[]        @relation("SubordinateReports")
+  reportsToSubs         ReportsTo[]        @relation("ManagerReports")
+  canonicalNarrative    CanonicalNarrative?
+
+  @@unique([orgId, email])
+  @@map("users")
+}
+
+enum UserRole {
+  admin
+  manager
+  member
+}
+
+// ─────────────────────────────────────────────
+// DepartmentMember
+// ─────────────────────────────────────────────
+model DepartmentMember {
+  id           String  @id @default(cuid())
+  departmentId String  @map("department_id")
+  userId       String  @map("user_id")
+  isPrimary    Boolean @default(true) @map("is_primary")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, userId])
+  @@map("department_members")
+}
+
+// ─────────────────────────────────────────────
+// DepartmentLevelConfig
+// ─────────────────────────────────────────────
+model DepartmentLevelConfig {
+  id           String   @id @default(cuid())
+  departmentId String   @map("department_id")
+  levelNumber  Int      @map("level_number")
+  levelTitle   String?  @map("level_title")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, levelNumber])
+  @@map("department_level_configs")
+}
+
+// ─────────────────────────────────────────────
+// ReportsTo
+// ─────────────────────────────────────────────
+model ReportsTo {
+  id                String   @id @default(cuid())
+  subordinateUserId String   @map("subordinate_user_id")
+  managerUserId     String   @map("manager_user_id")
+  departmentId      String   @map("department_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  subordinate User       @relation("SubordinateReports", fields: [subordinateUserId], references: [id], onDelete: Cascade)
+  manager     User       @relation("ManagerReports", fields: [managerUserId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([subordinateUserId, managerUserId, departmentId])
+  @@map("reports_to")
+}
+
+// ─────────────────────────────────────────────
+// Report
+// ─────────────────────────────────────────────
+model Report {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  submittedAt DateTime     @default(now()) @map("submitted_at")
+  source      ReportSource
+  rawText     String?      @map("raw_text")
+  rawPdfUrl   String?      @map("raw_pdf_url")
+  parsed      Boolean      @default(false)
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parsedReport ParsedReport?
+
+  @@map("reports")
+}
+
+enum ReportSource {
+  form
+  pdf_upload
+  email
+}
+
+// ─────────────────────────────────────────────
+// ParsedReport
+// ─────────────────────────────────────────────
+model ParsedReport {
+  id              String   @id @default(cuid())
+  reportId        String   @unique @map("report_id")
+  userId          String   @map("user_id")
+  date            DateTime
+  aiSummary       String?  @map("ai_summary")
+  structuredData  Json?    @map("structured_data")
+  totalHours      Decimal? @map("total_hours") @db.Decimal(5, 2)
+  notes           String?
+  blockers        String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  report        Report          @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  taskHistories TaskHistory[]
+
+  @@map("parsed_reports")
+}
+
+// ─────────────────────────────────────────────
+// Task
+// ─────────────────────────────────────────────
+model Task {
+  id             String     @id @default(cuid())
+  parsedReportId String     @map("parsed_report_id")
+  userId         String     @map("user_id")
+  projectName    String?    @map("project_name")
+  description    String
+  dueDate        DateTime?  @map("due_date")
+  hoursToday     Decimal?   @map("hours_today") @db.Decimal(5, 2)
+  pctComplete    Int?       @map("pct_complete")
+  status         TaskStatus @default(on_track)
+  priorityRank   Int?       @map("priority_rank")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  parsedReport  ParsedReport  @relation(fields: [parsedReportId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskHistories TaskHistory[]
+  emailDrafts   EmailDraft[]
+
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  on_track
+  at_risk
+  blocked
+  complete
+}
+
+// ─────────────────────────────────────────────
+// TaskHistory
+// ─────────────────────────────────────────────
+model TaskHistory {
+  id              String     @id @default(cuid())
+  taskId          String     @map("task_id")
+  canonicalTaskId String?    @map("canonical_task_id")
+  reportId        String     @map("report_id")
+  snapshotDate    DateTime   @map("snapshot_date")
+  pctComplete     Int?       @map("pct_complete")
+  status          TaskStatus
+  hours           Decimal?   @db.Decimal(5, 2)
+
+  task          Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  canonicalTask CanonicalTask? @relation(fields: [canonicalTaskId], references: [id])
+  parsedReport  ParsedReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("task_histories")
+}
+
+// ─────────────────────────────────────────────
+// CanonicalTask
+// ─────────────────────────────────────────────
+model CanonicalTask {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  projectName   String?  @map("project_name")
+  description   String
+  firstSeenDate DateTime @map("first_seen_date")
+  lastSeenDate  DateTime @map("last_seen_date")
+  isStalled     Boolean  @default(false) @map("is_stalled")
+  stallDays     Int      @default(0) @map("stall_days")
+  isComplete    Boolean  @default(false) @map("is_complete")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskHistories TaskHistory[]
+  alerts        Alert[]
+  emailDrafts   EmailDraft[]
+
+  @@map("canonical_tasks")
+}
+
+// ─────────────────────────────────────────────
+// CanonicalNarrative
+// ─────────────────────────────────────────────
+model CanonicalNarrative {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique @map("user_id")
+  orgId                  String   @map("org_id")
+  currentNarrative       String   @map("current_narrative")
+  projectsMentioned      Json     @default("[]") @map("projects_mentioned")
+  riskSignals            Json     @default("[]") @map("risk_signals")
+  lastReportDate         DateTime? @map("last_report_date")
+  consecutiveDaysNoChange Int     @default(0) @map("consecutive_days_no_change")
+  lastUpdated            DateTime @default(now()) @map("last_updated")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("canonical_narratives")
+}
+
+// ─────────────────────────────────────────────
+// Alert
+// ─────────────────────────────────────────────
+model Alert {
+  id              String        @id @default(cuid())
+  orgId           String        @map("org_id")
+  userId          String        @map("user_id")
+  canonicalTaskId String?       @map("canonical_task_id")
+  alertType       AlertType     @map("alert_type")
+  message         String
+  severity        AlertSeverity
+  isRead          Boolean       @default(false) @map("is_read")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canonicalTask CanonicalTask? @relation(fields: [canonicalTaskId], references: [id])
+
+  @@map("alerts")
+}
+
+enum AlertType {
+  stall
+  overdue
+  missing_submission
+  pattern
+}
+
+enum AlertSeverity {
+  info
+  warning
+  critical
+}
+
+// ─────────────────────────────────────────────
+// EmailDraft
+// ─────────────────────────────────────────────
+model EmailDraft {
+  id                     String    @id @default(cuid())
+  orgId                  String    @map("org_id")
+  createdByUserId        String    @map("created_by_user_id")
+  recipientUserId        String    @map("recipient_user_id")
+  subject                String
+  body                   String
+  relatedTaskId          String?   @map("related_task_id")
+  relatedCanonicalTaskId String?   @map("related_canonical_task_id")
+  sentAt                 DateTime? @map("sent_at")
+  createdAt              DateTime  @default(now()) @map("created_at")
+
+  organization         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy            User           @relation("EmailDraftCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  recipient            User           @relation("EmailDraftRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  relatedTask          Task?          @relation(fields: [relatedTaskId], references: [id])
+  relatedCanonicalTask CanonicalTask? @relation(fields: [relatedCanonicalTaskId], references: [id])
+
+  @@map("email_drafts")
+}
+
+// ─────────────────────────────────────────────
+// DailySummary
+// ─────────────────────────────────────────────
+model DailySummary {
+  id                 String   @id @default(cuid())
+  orgId              String   @map("org_id")
+  summaryDate        DateTime @map("summary_date")
+  aiFullSummary      String?  @map("ai_full_summary")
+  tier1Json          Json?    @map("tier1_json")
+  tier2Json          Json?    @map("tier2_json")
+  tier3Json          Json?    @map("tier3_json")
+  totalSubmissions   Int      @default(0) @map("total_submissions")
+  missingSubmissions Int      @default(0) @map("missing_submissions")
+  alertCount         Int      @default(0) @map("alert_count")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, summaryDate])
+  @@map("daily_summaries")
+}
