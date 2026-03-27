@@ -89,7 +89,7 @@ export default function WorkspaceSidebar({ user, workspace, allWorkspaces }: Wor
           <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
             <Zap className="h-3.5 w-3.5 text-white" />
           </div>
-          <span className="text-slate-500 text-xs font-medium">OrgPulse AI</span>
+          <span className="text-slate-500 text-xs font-medium">OrgRise AI</span>
         </div>
         {/* Workspace switcher */}
         <button

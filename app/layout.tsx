@@ -5,13 +5,13 @@ import "./globals.css";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "OrgPulse AI",
+  title: "OrgRise AI",
   description: "AI-powered organizational reporting and intelligence platform",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "OrgPulse",
+    title: "OrgRise",
   },
 };
 
@@ -34,7 +34,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="OrgPulse" />
+        <meta name="apple-mobile-web-app-title" content="OrgRise" />
       </head>
       <body className="font-sans antialiased">
         {children}

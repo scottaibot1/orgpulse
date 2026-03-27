@@ -6,7 +6,7 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-const FROM = process.env.FROM_EMAIL ?? "OrgPulse AI <reports@orgpulse.ai>";
+const FROM = process.env.FROM_EMAIL ?? "OrgRise AI <reports@orgrise.ai>";
 
 export async function sendSummaryEmail({
   toEmail,
@@ -104,7 +104,7 @@ export async function sendSummaryEmail({
 
   <div class="footer">
     <span>${orgName} · Confidential</span>
-    <span>Sent by OrgPulse AI</span>
+    <span>Sent by OrgRise AI</span>
   </div>
 </div>
 </body>

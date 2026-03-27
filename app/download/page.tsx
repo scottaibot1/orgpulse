@@ -13,9 +13,9 @@ function detectOS(ua: string): "mac" | "windows" | "ios" | "android" | "unknown"
 }
 
 // Replace with your actual GitHub releases URL once you push a release
-const GITHUB_RELEASES = "https://github.com/YOUR_ORG/orgpulse/releases/latest";
-const MAC_DMG = `${GITHUB_RELEASES}/download/OrgPulse-universal.dmg`;
-const WIN_EXE = `${GITHUB_RELEASES}/download/OrgPulse-Setup.exe`;
+const GITHUB_RELEASES = "https://github.com/scottaibot1/orgrise/releases/latest";
+const MAC_DMG = `${GITHUB_RELEASES}/download/OrgRise-universal.dmg`;
+const WIN_EXE = `${GITHUB_RELEASES}/download/OrgRise-Setup.exe`;
 
 export default async function DownloadPage() {
   const headersList = await headers();
@@ -28,9 +28,9 @@ export default async function DownloadPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-white text-2xl font-bold">OP</span>
+            <span className="text-white text-2xl font-bold">OR</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">Download OrgPulse</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Download OrgRise</h1>
           <p className="text-slate-500 mt-2">
             Native desktop app for Mac and Windows, or install directly from your browser on mobile.
           </p>
@@ -46,7 +46,7 @@ export default async function DownloadPage() {
                   Recommended for your device
                 </p>
                 <p className="text-lg font-bold mt-0.5">
-                  {os === "mac" ? "OrgPulse for Mac" : "OrgPulse for Windows"}
+                  {os === "mac" ? "OrgRise for Mac" : "OrgRise for Windows"}
                 </p>
                 <p className="text-sm opacity-75 mt-0.5">
                   {os === "mac"
@@ -113,7 +113,7 @@ export default async function DownloadPage() {
               </div>
             </div>
             <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 leading-relaxed">
-              Open OrgPulse in <strong>Safari</strong>, tap the{" "}
+              Open OrgRise in <strong>Safari</strong>, tap the{" "}
               <strong>Share</strong> button, then tap{" "}
               <strong>Add to Home Screen</strong>.
             </div>
@@ -129,7 +129,7 @@ export default async function DownloadPage() {
               </div>
             </div>
             <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3 leading-relaxed">
-              Open OrgPulse in <strong>Chrome</strong>, tap the{" "}
+              Open OrgRise in <strong>Chrome</strong>, tap the{" "}
               <strong>three-dot menu</strong>, then tap{" "}
               <strong>Add to Home screen</strong>.
             </div>

@@ -39,7 +39,7 @@ export default function LoginPage() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <span className="text-white font-bold text-lg">OrgPulse AI</span>
+          <span className="text-white font-bold text-lg">OrgRise AI</span>
         </div>
 
         <div className="space-y-6">
@@ -79,7 +79,7 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-slate-900 font-bold text-lg">OrgPulse AI</span>
+            <span className="text-slate-900 font-bold text-lg">OrgRise AI</span>
           </div>
 
           <div>

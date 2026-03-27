@@ -1,4 +1,4 @@
-# OrgPulse — Deployment Guide
+# OrgRise — Deployment Guide
 
 ## Environment Variables
 
@@ -15,7 +15,7 @@ All variables below must be set in every environment (Vercel dashboard for produ
 | `RESEND_API_KEY` | ✅ | Resend API key for email delivery |
 | `FROM_EMAIL` | ✅ | Sender address (must be verified domain in Resend) |
 | `CRON_SECRET` | ✅ | Random secret to authenticate the `/api/cron` endpoint |
-| `NEXT_PUBLIC_APP_URL` | ✅ | Full URL of the deployed app, e.g. `https://orgpulse.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | ✅ | Full URL of the deployed app, e.g. `https://orgrise.ai` |
 
 ---
 
@@ -60,7 +60,7 @@ The endpoint authenticates via the `Authorization: Bearer <CRON_SECRET>` header.
 To change the schedule, edit the `schedule` field in `vercel.json` (standard cron syntax).
 
 ### After deployment
-- Note your production URL (e.g. `https://orgpulse.vercel.app`)
+- Note your production URL (e.g. `https://orgrise.ai`)
 - Update `NEXT_PUBLIC_APP_URL` in Vercel env vars to match
 - Run `vercel --prod` again after updating env vars
 
@@ -69,12 +69,12 @@ To change the schedule, edit the `schedule` field in `vercel.json` (standard cro
 ## TWO — Resend Email Setup
 
 1. Sign up at [resend.com](https://resend.com)
-2. Go to **Domains** → Add your domain (e.g. `orgpulse.ai`)
+2. Go to **Domains** → Add your domain (e.g. `orgrise.ai`)
 3. Add the DNS records Resend shows to your DNS provider
 4. Wait for verification (usually < 5 minutes)
 5. Go to **API Keys** → Create a new key with "Sending access"
 6. Copy the key and set it as `RESEND_API_KEY` in Vercel env vars
-7. Set `FROM_EMAIL` to an address on your verified domain (e.g. `reports@orgpulse.ai`)
+7. Set `FROM_EMAIL` to an address on your verified domain (e.g. `reports@orgrise.ai`)
 
 Emails are sent:
 - On every manual "Generate" click from the dashboard
@@ -98,7 +98,7 @@ The PWA is already configured. No additional steps required after deployment.
 **Installing on iPhone:**
 1. Open the production URL in Safari
 2. Tap the Share button → "Add to Home Screen"
-3. The app installs with the OrgPulse icon and opens without browser chrome
+3. The app installs with the OrgRise icon and opens without browser chrome
 
 **Installing on Android:**
 1. Open in Chrome
@@ -133,7 +133,7 @@ const APP_URL = "https://your-actual-vercel-url.vercel.app";
 "publish": {
   "provider": "github",
   "owner": "YOUR_GITHUB_ORG",
-  "repo": "orgpulse"
+  "repo": "orgrise"
 }
 ```
 
@@ -156,11 +156,11 @@ npm install
 
 # Build Mac universal DMG (Intel + Apple Silicon)
 npm run electron:build:mac
-# Output: dist/OrgPulse-1.0.0-universal.dmg
+# Output: dist/OrgRise-1.0.0-universal.dmg
 
 # Build Windows installer (run on Windows or with Wine)
 npm run electron:build:win
-# Output: dist/OrgPulse-Setup-1.0.0.exe
+# Output: dist/OrgRise-Setup-1.0.0.exe
 
 # Build both (from Mac, Windows exe requires cross-compile config)
 npm run electron:build:all

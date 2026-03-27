@@ -1,5 +1,5 @@
 {
-  "name": "orgpulse",
+  "name": "orgrise",
   "version": "1.0.0",
   "private": true,
   "main": "electron/main.js",
@@ -56,8 +56,8 @@
     "typescript": "^5.9.3"
   },
   "build": {
-    "appId": "ai.orgpulse.app",
-    "productName": "OrgPulse",
+    "appId": "ai.orgrise.app",
+    "productName": "OrgRise",
     "files": [
       "electron/**/*",
       "public/icons/**/*",
@@ -69,7 +69,7 @@
     "publish": {
       "provider": "github",
       "owner": "YOUR_GITHUB_ORG",
-      "repo": "orgpulse"
+      "repo": "orgrise"
     },
     "mac": {
       "target": [
@@ -80,7 +80,7 @@
       ],
       "category": "public.app-category.business",
       "icon": "public/icons/icon-512.png",
-      "artifactName": "OrgPulse-${version}-universal.dmg"
+      "artifactName": "OrgRise-${version}-universal.dmg"
     },
     "win": {
       "target": [
@@ -90,7 +90,7 @@
         }
       ],
       "icon": "public/icons/icon-512.png",
-      "artifactName": "OrgPulse-Setup-${version}.exe"
+      "artifactName": "OrgRise-Setup-${version}.exe"
     },
     "nsis": {
       "oneClick": true,
@@ -98,7 +98,7 @@
       "allowToChangeInstallationDirectory": false
     },
     "dmg": {
-      "title": "Install OrgPulse",
+      "title": "Install OrgRise",
       "background": null,
       "window": {
         "width": 540,

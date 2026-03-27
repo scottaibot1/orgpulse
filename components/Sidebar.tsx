@@ -72,7 +72,7 @@ export default function Sidebar({ user }: SidebarProps) {
           <Zap className="h-4 w-4 text-white" />
         </div>
         <div>
-          <p className="text-white font-bold text-sm leading-none">OrgPulse</p>
+          <p className="text-white font-bold text-sm leading-none">OrgRise</p>
           <p className="text-slate-500 text-xs mt-0.5">AI Platform</p>
         </div>
       </div>

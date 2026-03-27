@@ -3,7 +3,7 @@ const { autoUpdater } = require("electron-updater");
 const path = require("path");
 
 // URL of the deployed Vercel app — replace with your production URL
-const APP_URL = process.env.APP_URL || "https://orgpulse.vercel.app";
+const APP_URL = process.env.APP_URL || "https://orgrise.ai";
 
 let mainWindow;
 
@@ -120,7 +120,7 @@ autoUpdater.on("update-available", () => {
   dialog.showMessageBox({
     type: "info",
     title: "Update available",
-    message: "A new version of OrgPulse is available. It will be downloaded in the background.",
+    message: "A new version of OrgRise is available. It will be downloaded in the background.",
   });
 });
 
@@ -130,7 +130,7 @@ autoUpdater.on("update-downloaded", () => {
     .showMessageBox({
       type: "info",
       title: "Update ready",
-      message: "Update downloaded. OrgPulse will restart to apply the update.",
+      message: "Update downloaded. OrgRise will restart to apply the update.",
       buttons: ["Restart now", "Later"],
     })
     .then(({ response }) => {

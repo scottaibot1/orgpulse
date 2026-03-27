@@ -55,7 +55,7 @@ export default function DashboardNav({ user }: NavProps) {
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <span className="text-xl font-bold text-gray-900">OrgPulse</span>
+            <span className="text-xl font-bold text-gray-900">OrgRise</span>
             <Badge variant="secondary" className="text-xs hidden sm:inline-flex">AI</Badge>
           </div>
 

@@ -78,7 +78,7 @@ export default function CreateWorkspaceForm() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <span className="text-white font-bold text-lg">OrgPulse AI</span>
+          <span className="text-white font-bold text-lg">OrgRise AI</span>
         </div>
         <h1 className="text-2xl font-bold text-white mt-4">Create a new workspace</h1>
         <p className="text-slate-400 text-sm mt-1">Each workspace is completely independent — its own team, reports, and AI settings.</p>

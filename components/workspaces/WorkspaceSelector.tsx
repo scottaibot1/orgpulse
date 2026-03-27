@@ -35,7 +35,7 @@ export default function WorkspaceSelector({ workspaces }: Props) {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
             <Zap className="h-4 w-4 text-white" />
           </div>
-          <span className="text-white font-bold text-base">OrgPulse AI</span>
+          <span className="text-white font-bold text-base">OrgRise AI</span>
         </div>
         <div className="flex items-center gap-3">
           {workspaces.length > 1 && (

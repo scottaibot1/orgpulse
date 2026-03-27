@@ -1,4 +1,4 @@
-const CACHE_NAME = "orgpulse-v1";
+const CACHE_NAME = "orgrise-v1";
 
 // Static assets to cache on install
 const PRECACHE_URLS = [
