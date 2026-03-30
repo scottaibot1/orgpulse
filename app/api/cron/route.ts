@@ -144,7 +144,6 @@ export async function POST(request: NextRequest) {
         )
       );
 
-      const dueTodayIds = dueTodayUsers.map((u) => u.id);
       const allUserIds = activeUsers.map((u) => u.id);
 
       // Get today's parsed reports for all users

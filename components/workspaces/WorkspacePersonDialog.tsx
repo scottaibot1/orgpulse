@@ -61,7 +61,7 @@ function getLevelLabel(lvl: number, configs: LevelConfig[]): string {
   return (config?.levelTitle?.trim()) ? config.levelTitle.trim() : `Level ${lvl}`;
 }
 
-export default function WorkspacePersonDialog({ open, onClose, onSaved, editing, orgId, canToggleReporting = true, isAdmin = false }: Props) {
+export default function WorkspacePersonDialog({ open, onClose, onSaved, editing, orgId, canToggleReporting = true }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<DeptWithLevels[]>([]);
