@@ -45,6 +45,7 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptIds, setSelectedDeptIds] = useState<string[]>([]);
   const [primaryDeptId, setPrimaryDeptId] = useState<string>("");
+  const [editEmail, setEditEmail] = useState("");
 
   const {
     register,
@@ -67,6 +68,7 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
     if (open) {
       setError(null);
       if (editing) {
+        setEditEmail(editing.email);
         reset({
           name: editing.name,
           email: editing.email,
@@ -78,6 +80,7 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
         const primary = editing.departmentMemberships.find((m) => m.isPrimary);
         setPrimaryDeptId(primary?.departmentId ?? ids[0] ?? "");
       } else {
+        setEditEmail("");
         reset({ name: "", email: "", title: "", role: "member" });
         setSelectedDeptIds([]);
         setPrimaryDeptId("");
@@ -103,6 +106,7 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
 
     const payload = {
       ...data,
+      ...(editing ? { email: editEmail } : {}),
       departmentIds: selectedDeptIds,
       primaryDepartmentId: primaryDeptId,
     };
@@ -150,13 +154,20 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
 
           <div className="space-y-2">
             <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="jane@company.com"
-              {...register("email")}
-            />
-            {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
+            {editing ? (
+              <input
+                id="email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            ) : (
+              <>
+                <Input id="email" type="email" placeholder="jane@company.com" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
