@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  email: z.string().email().optional(),
   title: z.string().nullable().optional(),
   role: z.enum(["admin", "manager", "member"]).optional(),
   departmentIds: z.array(z.string()).optional(),
@@ -31,7 +32,18 @@ export async function PATCH(
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { departmentIds, primaryDepartmentId, ...userData } = parsed.data;
+  const { departmentIds, primaryDepartmentId, email: newEmail, ...userData } = parsed.data;
+
+  if (newEmail !== undefined && newEmail !== existing.email) {
+    if (sessionUser.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can change email addresses" }, { status: 403 });
+    }
+    const conflict = await prisma.user.findFirst({ where: { orgId: sessionUser.orgId, email: newEmail, id: { not: id } } });
+    if (conflict) {
+      return NextResponse.json({ error: "That email address is already in use" }, { status: 409 });
+    }
+    (userData as Record<string, unknown>).email = newEmail;
+  }
 
   await prisma.user.update({ where: { id }, data: userData });
 

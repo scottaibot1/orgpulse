@@ -155,12 +155,8 @@ export default function PersonDialog({ open, onClose, onSaved, editing }: Props)
               type="email"
               placeholder="jane@company.com"
               {...register("email")}
-              disabled={!!editing}
             />
             {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
-            {editing && (
-              <p className="text-xs text-gray-400">Email cannot be changed after creation</p>
-            )}
           </div>
 
           <div className="space-y-2">

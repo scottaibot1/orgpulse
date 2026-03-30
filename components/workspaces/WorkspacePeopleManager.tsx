@@ -12,12 +12,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Link, Search, UserCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Link, Search, UserCircle, Mail, Check } from "lucide-react";
 import WorkspacePersonDialog from "./WorkspacePersonDialog";
 import type { UserWithDepartments } from "@/types";
 
 interface Props {
   orgId: string;
+  isAdmin?: boolean; // kept for backwards compat but overridden by server fetch
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -29,12 +30,21 @@ const ROLE_COLORS: Record<string, string> = {
 export default function WorkspacePeopleManager({ orgId }: Props) {
   const [people, setPeople] = useState<UserWithDepartments[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<UserWithDepartments | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [invitedId, setInvitedId] = useState<string | null>(null);
 
-  useEffect(() => { fetchPeople(); }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchPeople();
+    fetch(`/api/w/${orgId}/me`)
+      .then((r) => r.json())
+      .then((data) => { if (data.role === "admin") setIsAdmin(true); })
+      .catch(() => {});
+  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchPeople() {
     setLoading(true);
@@ -48,6 +58,19 @@ export default function WorkspacePeopleManager({ orgId }: Props) {
     if (!confirm(`Remove ${name} from the organization? This cannot be undone.`)) return;
     await fetch(`/api/w/${orgId}/users/${id}`, { method: "DELETE" });
     fetchPeople();
+  }
+
+  async function sendInvite(id: string) {
+    setInvitingId(id);
+    const res = await fetch(`/api/w/${orgId}/users/${id}/invite`, { method: "POST" });
+    setInvitingId(null);
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setInvitedId(id);
+      setTimeout(() => setInvitedId(null), 3000);
+    } else {
+      alert(`Failed to send invitation: ${body.error ?? res.statusText}`);
+    }
   }
 
   function copySubmissionLink(token: string, id: string) {
@@ -151,6 +174,18 @@ export default function WorkspacePeopleManager({ orgId }: Props) {
                       {copiedId === person.id && <span className="text-xs text-green-600 absolute">Copied!</span>}
                       <Button
                         variant="ghost" size="sm" className="h-8 w-8 p-0"
+                        title={invitedId === person.id ? "Invitation sent!" : "Send invitation email"}
+                        disabled={invitingId === person.id}
+                        onClick={() => sendInvite(person.id)}
+                      >
+                        {invitedId === person.id ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Mail className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="h-8 w-8 p-0"
                         onClick={() => { setEditingPerson(person); setDialogOpen(true); }}
                       >
                         <Pencil className="h-4 w-4" />
@@ -176,6 +211,7 @@ export default function WorkspacePeopleManager({ orgId }: Props) {
         onSaved={fetchPeople}
         editing={editingPerson}
         orgId={orgId}
+        isAdmin={isAdmin}
       />
     </div>
   );

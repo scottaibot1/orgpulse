@@ -19,6 +19,7 @@ import {
   Settings,
   ArrowLeftRight,
   ChevronDown,
+  HelpCircle,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -64,6 +65,7 @@ export default function WorkspaceSidebar({ user, workspace, allWorkspaces }: Wor
         { href: `${base}/people`, label: "People", icon: Users, exact: false },
         { href: `${base}/links`, label: "Submission Links", icon: Link2, exact: false },
         { href: `${base}/settings`, label: "Settings", icon: Settings, exact: false },
+        { href: `${base}/help`, label: "Help & Guide", icon: HelpCircle, exact: false },
       ],
     },
   ];

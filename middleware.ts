@@ -34,6 +34,7 @@ export async function middleware(request: NextRequest) {
   // Allow public routes
   const publicPaths = ["/login", "/signup", "/submit", "/setup"];
   const isPublic =
+    pathname === "/" ||
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith("/api/inbound-email") ||
     pathname.startsWith("/api/cron") ||

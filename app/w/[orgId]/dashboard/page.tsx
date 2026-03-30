@@ -7,6 +7,7 @@ import OrgChartFlow from "@/components/dashboard/OrgChartFlow";
 import DashboardReportsWidget, { type ReportRow } from "@/components/dashboard/DashboardReportsWidget";
 import SummaryWidget from "@/components/dashboard/SummaryWidget";
 import ArchivedSummaries from "@/components/dashboard/ArchivedSummaries";
+import GettingStartedBanner from "@/components/dashboard/GettingStartedBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,10 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [org, dbUser, deptCount, people, departments, todayReports, unreadAlerts, recentAlerts, allReports, allSummaries] = await Promise.all([
+  const [org, dbUser, deptCount, people, departments, executives, todayReports, unreadAlerts, recentAlerts, allReports, allSummaries] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: orgId },
-      select: { name: true, workspaceSettings: { select: { accentColor: true } } },
+      select: { name: true, workspaceSettings: { select: { accentColor: true, anthropicApiKey: true } } },
     }),
     prisma.user.findUnique({
       where: { orgId_email: { orgId, email } },
@@ -60,6 +61,14 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
           },
         },
       },
+    }),
+    prisma.user.findMany({
+      where: { orgId, executiveTier: { not: null } },
+      select: {
+        id: true, name: true, title: true, executiveTier: true,
+        executiveDepartments: { select: { departmentId: true } },
+      },
+      orderBy: [{ executiveTier: "asc" }, { name: "asc" }],
     }),
     prisma.parsedReport.findMany({
       where: { user: { orgId }, date: { gte: today, lt: tomorrow } },
@@ -97,7 +106,7 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
     }),
     prisma.dailySummary.findMany({
       where: { orgId },
-      orderBy: { summaryDate: "desc" },
+      orderBy: { createdAt: "desc" },
       take: 30,
       select: { id: true, summaryDate: true, totalSubmissions: true, missingSubmissions: true, createdAt: true },
     }),
@@ -137,6 +146,7 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
     percentage: people.length > 0 ? Math.round((submittedCount / people.length) * 100) : 0,
   };
   const accentColor = org?.workspaceSettings?.accentColor ?? "#6366f1";
+  const hasApiKey = !!org?.workspaceSettings?.anthropicApiKey;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
 
@@ -183,6 +193,16 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Getting Started Banner */}
+      <GettingStartedBanner
+        orgId={orgId}
+        hasDepartments={deptCount > 0}
+        hasPeople={people.length > 1}
+        hasApiKey={hasApiKey}
+        hasSummary={allSummaries.length > 0}
+        accentColor={accentColor}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -305,13 +325,13 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
 
       {/* Main two-column layout */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left: Reports (48%) */}
-        <div className="w-full lg:w-[48%] min-h-[500px]">
+        {/* Left: Reports (38%) */}
+        <div className="w-full lg:w-[38%]">
           <DashboardReportsWidget reports={reportRows} orgId={orgId} accentColor={accentColor} />
         </div>
 
-        {/* Right: Org Chart (52%) */}
-        <div className="w-full lg:w-[52%]">
+        {/* Right: Org Chart (62%) */}
+        <div className="w-full lg:w-[62%]">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden h-full">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
@@ -335,7 +355,20 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
                 </Link>
               </div>
             ) : (
-              <OrgChartFlow departments={deptNodes} orgName={org?.name ?? "Organization"} compact />
+              <OrgChartFlow
+              departments={deptNodes}
+              executives={executives.map((e) => ({
+                id: e.id,
+                name: e.name,
+                title: e.title,
+                tier: e.executiveTier as 1 | 2,
+                departmentIds: e.executiveDepartments.map((d) => d.departmentId),
+                status: submittedIds.has(e.id) ? "submitted" as const : "missing" as const,
+              }))}
+              orgName={org?.name ?? "Organization"}
+              orgId={orgId}
+              compact
+            />
             )}
           </div>
         </div>

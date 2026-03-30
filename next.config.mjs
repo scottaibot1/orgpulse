@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
   webpack: (config, { isServer }) => {
     if (isServer) {
       // unzipper has an optional peer dep on @aws-sdk/client-s3 that we don't use

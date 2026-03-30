@@ -22,7 +22,7 @@ export default async function WorkspacePeoplePage({ params }: Props) {
         <h1 className="text-2xl font-bold text-gray-900">People</h1>
         <p className="text-gray-500 mt-1">Manage team members and their department assignments.</p>
       </div>
-      <WorkspacePeopleManager orgId={orgId} />
+      <WorkspacePeopleManager orgId={orgId} isAdmin={user.role === "admin"} />
     </div>
   );
 }

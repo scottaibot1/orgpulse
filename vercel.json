@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "app/api/submit/[token]/route.ts": { "maxDuration": 60 },
+    "app/api/w/[orgId]/summary/route.ts": { "maxDuration": 60 },
+    "app/api/cron/route.ts": { "maxDuration": 60 }
+  },
   "crons": [
     {
       "path": "/api/cron",

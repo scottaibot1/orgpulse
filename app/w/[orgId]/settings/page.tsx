@@ -23,6 +23,11 @@ export default async function WorkspaceSettingsPage({ params }: Props) {
       cronTimezone: rawWorkspace.workspaceSettings.cronTimezone ?? "America/New_York",
       reportCollectionScope: rawWorkspace.workspaceSettings.reportCollectionScope ?? "everyone",
       anthropicApiKey: rawWorkspace.workspaceSettings.anthropicApiKey ?? null,
+      reportDetailLevel: rawWorkspace.workspaceSettings.reportDetailLevel ?? 3,
+      departmentOrdering: rawWorkspace.workspaceSettings.departmentOrdering ?? "manual",
+      biweeklyStartDate: rawWorkspace.workspaceSettings.biweeklyStartDate
+        ? new Date(rawWorkspace.workspaceSettings.biweeklyStartDate).toISOString().split("T")[0]
+        : null,
     } : null,
   };
 

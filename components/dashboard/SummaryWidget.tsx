@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, RefreshCw, FileDown } from "lucide-react";
+import { Sparkles, RefreshCw, FileDown, Mail, AlertCircle } from "lucide-react";
 
 interface Props {
   orgId: string;
@@ -14,6 +14,7 @@ export default function SummaryWidget({ orgId, accentColor, lastSummary }: Props
   const [summaryId, setSummaryId] = useState<string | null>(lastSummary?.id ?? null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(lastSummary?.date ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<{ sent: boolean; to: string | null; error: string | null } | null>(null);
 
   async function generate() {
     setGenerating(true);
@@ -30,6 +31,7 @@ export default function SummaryWidget({ orgId, accentColor, lastSummary }: Props
 
       setSummaryId(data.id);
       setGeneratedAt(data.generatedAt);
+      setEmailStatus({ sent: data.emailSent ?? false, to: data.emailTo ?? null, error: data.emailError ?? null });
     } catch {
       setError("Network error — please try again");
     } finally {
@@ -92,6 +94,20 @@ export default function SummaryWidget({ orgId, accentColor, lastSummary }: Props
       {error && (
         <div className="px-5 py-3 border-b border-red-100 bg-red-50">
           <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Email status */}
+      {emailStatus && (
+        <div className={`px-5 py-2.5 border-b flex items-center gap-2 text-sm ${
+          emailStatus.sent
+            ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+            : "bg-red-50 border-red-100 text-red-600"
+        }`}>
+          {emailStatus.sent
+            ? <><Mail className="h-4 w-4 flex-shrink-0" /> Summary emailed to <strong>{emailStatus.to}</strong></>
+            : <><AlertCircle className="h-4 w-4 flex-shrink-0" /> Email not sent: {emailStatus.error}</>
+          }
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { marked } from "marked";
+import { parseAiSummary, renderEmailHtml } from "@/lib/report-renderer";
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY not set");
@@ -29,20 +30,26 @@ export async function sendSummaryEmail({
   markdown: string;
   appUrl: string;
 }) {
-  const total = totalSubmissions + missingSubmissions;
-  const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
-
-  const formattedDate = summaryDate.toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  const bodyHtml = marked.parse(markdown) as string;
   const pdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print`;
+  const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl };
 
-  const rateColor = rate === 100 ? "#15803d" : rate >= 70 ? "#b45309" : "#b91c1c";
-  const rateBg   = rate === 100 ? "#f0fdf4" : rate >= 70 ? "#fffbeb" : "#fef2f2";
+  // Try new structured JSON format first; fall back to legacy markdown for old records
+  const parsed = parseAiSummary(markdown);
+  let html: string;
+  if (parsed) {
+    html = renderEmailHtml(parsed, ctx);
+  } else {
+    // Legacy markdown fallback
+    const total = totalSubmissions + missingSubmissions;
+    const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
+    const formattedDate = summaryDate.toLocaleDateString("en-US", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+    });
+    const bodyHtml = marked.parse(markdown) as string;
+    const rateColor = rate === 100 ? "#15803d" : rate >= 70 ? "#b45309" : "#b91c1c";
+    const rateBg   = rate === 100 ? "#f0fdf4" : rate >= 70 ? "#fffbeb" : "#fef2f2";
 
-  const html = `<!DOCTYPE html>
+    html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -78,7 +85,6 @@ export async function sendSummaryEmail({
     <h1>${orgName} — Executive Summary</h1>
     <p>${formattedDate}</p>
   </div>
-
   <div class="stats">
     <div class="stat">
       <div class="val" style="color:#15803d">${totalSubmissions}</div>
@@ -93,15 +99,8 @@ export async function sendSummaryEmail({
       <div class="lbl">Rate</div>
     </div>
   </div>
-
-  <div class="body">
-    ${bodyHtml}
-  </div>
-
-  <div class="cta">
-    <a href="${pdfUrl}">View & Download PDF</a>
-  </div>
-
+  <div class="body">${bodyHtml}</div>
+  <div class="cta"><a href="${pdfUrl}">View &amp; Download PDF</a></div>
   <div class="footer">
     <span>${orgName} · Confidential</span>
     <span>Sent by OrgRise AI</span>
@@ -109,6 +108,7 @@ export async function sendSummaryEmail({
 </div>
 </body>
 </html>`;
+  }
 
   const subject = `${orgName} Executive Summary — ${summaryDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 
@@ -120,4 +120,87 @@ export async function sendSummaryEmail({
   });
 
   if (error) throw new Error(`Email send failed: ${error.message}`);
+}
+
+export async function sendInvitationEmail({
+  toEmail,
+  toName,
+  orgName,
+  submissionUrl,
+}: {
+  toEmail: string;
+  toName: string;
+  orgName: string;
+  submissionUrl: string;
+}) {
+  const firstName = toName.split(" ")[0];
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>You've been added to ${orgName} on OrgRise AI</title>
+<style>
+  body { margin: 0; padding: 0; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; }
+  .wrapper { max-width: 560px; margin: 32px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+  .top-bar { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 28px 32px; text-align: center; }
+  .top-bar .logo { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .top-bar .tagline { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+  .body { padding: 32px 32px 24px; }
+  .body h1 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 12px; }
+  .body p { font-size: 14px; line-height: 1.7; color: #475569; margin: 0 0 14px; }
+  .cta { margin: 28px 32px; text-align: center; }
+  .cta a { display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 36px; border-radius: 10px; box-shadow: 0 4px 12px rgba(99,102,241,0.35); }
+  .url-box { margin: 0 32px 28px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; }
+  .url-box p { font-size: 11px; color: #94a3b8; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .url-box a { font-size: 12px; color: #6366f1; word-break: break-all; }
+  .footer { padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center; }
+  .footer p { font-size: 11px; color: #94a3b8; margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="top-bar">
+    <div class="logo">OrgRise AI</div>
+    <div class="tagline">AI-powered organizational reporting</div>
+  </div>
+
+  <div class="body">
+    <h1>Hi ${firstName}, you've been added to ${orgName}</h1>
+    <p>
+      Your manager has set you up on <strong>OrgRise AI</strong> — a platform that helps your team
+      share daily updates and keep leadership informed automatically.
+    </p>
+    <p>
+      Your job is simple: click the button below and upload your status report. You can upload
+      a PDF, Word doc, spreadsheet, or even a plain text file. OrgRise AI takes care of the rest.
+    </p>
+    <p>This link is personal to you — bookmark it for future submissions.</p>
+  </div>
+
+  <div class="cta">
+    <a href="${submissionUrl}">Submit My Report</a>
+  </div>
+
+  <div class="url-box">
+    <p>Your personal submission link</p>
+    <a href="${submissionUrl}">${submissionUrl}</a>
+  </div>
+
+  <div class="footer">
+    <p>${orgName} &middot; Powered by OrgRise AI &middot; This link is unique to you, do not share it.</p>
+  </div>
+</div>
+</body>
+</html>`;
+
+  const { error } = await getResend().emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `You've been added to ${orgName} on OrgRise AI`,
+    html,
+  });
+
+  if (error) throw new Error(`Invitation email failed: ${error.message}`);
 }

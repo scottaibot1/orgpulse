@@ -1,5 +1,20 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>;
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = "";
+  const data = new Uint8Array(buffer);
+  const pdf = await pdfjs.getDocument({ data, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((item: any) => item.str ?? "")
+      .join(" ");
+    pages.push(text);
+  }
+  return pages.join("\n").trim();
+}
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import * as unzipper from "unzipper";
@@ -13,8 +28,7 @@ export async function extractTextFromBuffer(
 
   // PDF
   if (mimeType === "application/pdf" || ext === "pdf") {
-    const data = await pdfParse(buffer);
-    return data.text.trim();
+    return extractPdfText(buffer);
   }
 
   // DOCX

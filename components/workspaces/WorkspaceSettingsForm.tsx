@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Check, Eye, EyeOff } from "lucide-react";
+import DepartmentOrderingWidget from "./DepartmentOrderingWidget";
 
 const ACCENT_COLORS = [
   { value: "#6366f1", label: "Indigo" },
@@ -98,6 +99,9 @@ interface WorkspaceData {
     submissionMethods: { type: string; active: boolean }[];
     reportCollectionScope?: string;
     anthropicApiKey?: string | null;
+    reportDetailLevel?: number;
+    departmentOrdering?: string;
+    biweeklyStartDate?: string | null;
   } | null;
 }
 
@@ -130,6 +134,12 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
   );
   const [anthropicApiKey, setAnthropicApiKey] = useState(settings?.anthropicApiKey ?? "");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [reportDetailLevel, setReportDetailLevel] = useState(settings?.reportDetailLevel ?? 3);
+  const [autoReportDetailLevel, setAutoReportDetailLevel] = useState((settings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? 3);
+  const [departmentOrdering, setDepartmentOrdering] = useState(settings?.departmentOrdering ?? "manual");
+  const [biweeklyStartDate, setBiweeklyStartDate] = useState(
+    settings?.biweeklyStartDate ? new Date(settings.biweeklyStartDate).toISOString().split("T")[0] : ""
+  );
 
   const [submissionMethods, setSubmissionMethods] = useState<{ type: string; active: boolean }[]>(
     settings?.submissionMethods ?? [
@@ -182,7 +192,7 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
     const res = await fetch(`/api/w/${orgId}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, cronSchedule, cronTimezone, submissionMethods, reportCollectionScope, anthropicApiKey: anthropicApiKey || null }),
+      body: JSON.stringify({ ...form, cronSchedule, cronTimezone, submissionMethods, reportCollectionScope, anthropicApiKey: anthropicApiKey || null, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate: biweeklyStartDate || null }),
     });
 
     if (!res.ok) {
@@ -411,6 +421,174 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
           <p className="text-xs text-slate-400">
             Used for document processing and daily summary generation. Stored securely and never shared.
           </p>
+        </div>
+
+        {/* Report Detail Level — Manual */}
+        <div className="space-y-3 pt-2 border-t border-slate-100">
+          <div>
+            <Label className="text-sm font-medium text-slate-700">Manual Summary Detail Level</Label>
+            <p className="text-xs text-slate-400 mt-0.5">Used when you generate a summary manually from the dashboard.</p>
+          </div>
+          <div className="grid grid-cols-5 gap-2 md:grid-cols-5 grid-cols-1">
+            {[
+              { level: 1, name: "Snapshot", desc: "The 60-second read. Top alerts only and one line per person. Nothing else.", icon: "⚡" },
+              { level: 2, name: "Brief", desc: "The 3-minute read. Key priorities and flags per department with no granular detail.", icon: "🔖" },
+              { level: 3, name: "Standard", desc: "The balanced read. Projects, progress, hours worked, and anything flagged. Most teams live here.", icon: "📊", recommended: true },
+              { level: 4, name: "Detailed", desc: "The deep read. Everything in Standard plus time breakdowns, specific metrics, and direct highlights from each report.", icon: "🔍" },
+              { level: 5, name: "Full Intelligence", desc: "The complete picture. Every data point, every hour, every detail from every report with visuals embedded. Nothing left out.", icon: "🧠" },
+            ].map((card) => (
+              <button
+                key={card.level}
+                type="button"
+                onClick={() => setReportDetailLevel(card.level)}
+                className={`relative flex flex-col items-center text-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                  reportDetailLevel === card.level
+                    ? "border-violet-500 bg-violet-50"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                {reportDetailLevel === card.level && (
+                  <span className="absolute top-1.5 right-1.5 bg-violet-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">✓</span>
+                )}
+                {"recommended" in card && card.recommended && reportDetailLevel !== card.level && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Recommended</span>
+                )}
+                <span className="text-xs text-slate-400 font-medium mb-1">{card.level}</span>
+                <span className="text-lg mb-1">{card.icon}</span>
+                <span className={`text-xs font-bold leading-tight mb-1.5 ${reportDetailLevel === card.level ? "text-violet-700" : "text-slate-700"}`}>{card.name}</span>
+                <span className="text-[10px] text-slate-400 leading-tight hidden md:block">{card.desc}</span>
+              </button>
+            ))}
+          </div>
+          <div className={`text-xs rounded-lg px-3 py-2 border ${
+            reportDetailLevel === 1 ? "bg-slate-50 border-slate-200 text-slate-500" :
+            reportDetailLevel === 2 ? "bg-blue-50 border-blue-200 text-blue-700" :
+            reportDetailLevel === 3 ? "bg-violet-50 border-violet-200 text-violet-700" :
+            reportDetailLevel === 4 ? "bg-indigo-50 border-indigo-200 text-indigo-700" :
+            "bg-purple-50 border-purple-200 text-purple-700"
+          }`}>
+            <span className="font-semibold">Example output — </span>
+            {reportDetailLevel === 1 && "🔥 3 items need attention. Sales on track. Marketing 1 missing. Ops flagged."}
+            {reportDetailLevel === 2 && "Sales: Henderson at 60%, Client calls going well. Marketing: Campaign delayed, Sarah missing."}
+            {reportDetailLevel === 3 && "Antonio logged 6 hrs. Henderson Proposal 60% complete, on track. Client calls with Meridian completed."}
+            {reportDetailLevel === 4 && "Antonio: 6.5 hrs total. Henderson Proposal 60% (3 hrs), Meridian calls 2 hrs, Admin 1.5 hrs. Proposal deadline March 28 — 3 days out."}
+            {reportDetailLevel === 5 && "Antonio Reyes submitted at 4:47 PM. Total reported hours: 6.5. Time allocation: Henderson Proposal 46% (3 hrs), Meridian client calls 31% (2 hrs), Administrative 23% (1.5 hrs). Henderson Proposal at 60% — deadline March 28. Flagged: awaiting legal approval may cause delay."}
+          </div>
+        </div>
+      </div>
+
+      {/* Automated Report Detail Level */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Automated Summary Detail Level</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Used when the scheduled cron job generates and emails summaries automatically. Can differ from the manual level.</p>
+        </div>
+        <div className="grid grid-cols-5 gap-2 md:grid-cols-5 grid-cols-1">
+          {[
+            { level: 1, name: "Snapshot", desc: "The 60-second read. Top alerts only and one line per person.", icon: "⚡" },
+            { level: 2, name: "Brief", desc: "The 3-minute read. Key priorities and flags per department.", icon: "🔖" },
+            { level: 3, name: "Standard", desc: "The balanced read. Projects, progress, hours, and anything flagged.", icon: "📊", recommended: true },
+            { level: 4, name: "Detailed", desc: "Everything in Standard plus time breakdowns and specific metrics.", icon: "🔍" },
+            { level: 5, name: "Full Intelligence", desc: "Every data point, every hour, every detail. Nothing left out.", icon: "🧠" },
+          ].map((card) => (
+            <button
+              key={card.level}
+              type="button"
+              onClick={() => setAutoReportDetailLevel(card.level)}
+              className={`relative flex flex-col items-center text-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                autoReportDetailLevel === card.level
+                  ? "border-violet-500 bg-violet-50"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              {autoReportDetailLevel === card.level && (
+                <span className="absolute top-1.5 right-1.5 bg-violet-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">✓</span>
+              )}
+              {"recommended" in card && card.recommended && autoReportDetailLevel !== card.level && (
+                <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Recommended</span>
+              )}
+              <span className="text-xs text-slate-400 font-medium mb-1">{card.level}</span>
+              <span className="text-lg mb-1">{card.icon}</span>
+              <span className={`text-xs font-bold leading-tight mb-1.5 ${autoReportDetailLevel === card.level ? "text-violet-700" : "text-slate-700"}`}>{card.name}</span>
+              <span className="text-[10px] text-slate-400 leading-tight hidden md:block">{card.desc}</span>
+            </button>
+          ))}
+        </div>
+        <div className={`text-xs rounded-lg px-3 py-2 border ${
+          autoReportDetailLevel === 1 ? "bg-slate-50 border-slate-200 text-slate-500" :
+          autoReportDetailLevel === 2 ? "bg-blue-50 border-blue-200 text-blue-700" :
+          autoReportDetailLevel === 3 ? "bg-violet-50 border-violet-200 text-violet-700" :
+          autoReportDetailLevel === 4 ? "bg-indigo-50 border-indigo-200 text-indigo-700" :
+          "bg-purple-50 border-purple-200 text-purple-700"
+        }`}>
+          <span className="font-semibold">Scheduled email will look like — </span>
+          {autoReportDetailLevel === 1 && "🔥 3 items need attention. Sales on track. Marketing 1 missing. Ops flagged."}
+          {autoReportDetailLevel === 2 && "Sales: Henderson at 60%, Client calls going well. Marketing: Campaign delayed, Sarah missing."}
+          {autoReportDetailLevel === 3 && "Antonio logged 6 hrs. Henderson Proposal 60% complete, on track. Client calls with Meridian completed."}
+          {autoReportDetailLevel === 4 && "Antonio: 6.5 hrs total. Henderson Proposal 60% (3 hrs), Meridian calls 2 hrs, Admin 1.5 hrs. Proposal deadline March 28 — 3 days out."}
+          {autoReportDetailLevel === 5 && "Antonio Reyes submitted at 4:47 PM. Total reported hours: 6.5. Henderson Proposal at 60% — deadline March 28. Flagged: awaiting legal approval may cause delay."}
+        </div>
+      </div>
+
+      {/* Department Report Ordering */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Department Report Ordering</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            How should departments be ordered in the executive summary?
+          </p>
+        </div>
+        <div className="space-y-3">
+          {[
+            {
+              value: "manual",
+              label: "Manual",
+              description: "You control the order. Drag and drop departments to set their priority below.",
+            },
+            {
+              value: "ai_determined",
+              label: "AI Determined",
+              description: "Claude orders departments by urgency — departments with risks or missing reports appear first.",
+            },
+          ].map((option) => (
+            <label
+              key={option.value}
+              className={`flex items-start gap-3 cursor-pointer rounded-xl border p-4 transition-all ${
+                departmentOrdering === option.value
+                  ? "border-violet-300 bg-violet-50"
+                  : "border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              <input
+                type="radio"
+                className="mt-1 accent-violet-600"
+                checked={departmentOrdering === option.value}
+                onChange={() => setDepartmentOrdering(option.value)}
+              />
+              <div>
+                <p className="text-sm font-medium text-slate-800">{option.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{option.description}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {departmentOrdering === "manual" && (
+          <DepartmentOrderingWidget orgId={orgId} accentColor={form.accentColor} />
+        )}
+
+        {/* Biweekly cycle start date */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Biweekly Cycle Reference Date</p>
+            <p className="text-xs text-slate-500 mt-0.5">Set the Monday of week A for people on biweekly schedules. Used to determine which week is A vs B.</p>
+          </div>
+          <input
+            type="date"
+            value={biweeklyStartDate}
+            onChange={(e) => setBiweeklyStartDate(e.target.value)}
+            className="block w-full max-w-xs h-9 px-3 py-1 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+          />
         </div>
       </div>
 

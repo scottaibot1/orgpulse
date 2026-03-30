@@ -17,6 +17,10 @@ const updateSchema = z.object({
   })).optional(),
   reportCollectionScope: z.enum(["everyone", "leads_only"]).optional(),
   anthropicApiKey: z.string().nullable().optional(),
+  reportDetailLevel: z.number().int().min(1).max(5).optional(),
+  autoReportDetailLevel: z.number().int().min(1).max(5).optional(),
+  departmentOrdering: z.enum(["manual", "ai_determined"]).optional(),
+  biweeklyStartDate: z.string().nullable().optional(),
 });
 
 interface Params { params: Promise<{ orgId: string }> }
@@ -48,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { name, description, accentColor, cronSchedule, cronTimezone, reportCadence, aiParameters, submissionMethods, reportCollectionScope, anthropicApiKey } = parsed.data;
+  const { name, description, accentColor, cronSchedule, cronTimezone, reportCadence, aiParameters, submissionMethods, reportCollectionScope, anthropicApiKey, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate } = parsed.data;
 
   if (name) {
     await prisma.organization.update({ where: { id: orgId }, data: { name } });
@@ -64,6 +68,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (submissionMethods) settingsData.submissionMethods = submissionMethods;
   if (reportCollectionScope) settingsData.reportCollectionScope = reportCollectionScope;
   if (anthropicApiKey !== undefined) settingsData.anthropicApiKey = anthropicApiKey;
+  if (reportDetailLevel !== undefined) settingsData.reportDetailLevel = reportDetailLevel;
+  if (autoReportDetailLevel !== undefined) settingsData.autoReportDetailLevel = autoReportDetailLevel;
+  if (departmentOrdering !== undefined) settingsData.departmentOrdering = departmentOrdering;
+  if (biweeklyStartDate !== undefined) settingsData.biweeklyStartDate = biweeklyStartDate ? new Date(biweeklyStartDate) : null;
 
   if (Object.keys(settingsData).length > 0) {
     await prisma.workspaceSettings.upsert({

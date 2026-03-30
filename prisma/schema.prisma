@@ -44,6 +44,10 @@ model WorkspaceSettings {
   reportCollectionScope String   @default("everyone") @map("report_collection_scope")
   anthropicApiKey       String?  @map("anthropic_api_key")
   description           String?
+  reportDetailLevel     Int      @default(3) @map("report_detail_level")
+  autoReportDetailLevel Int      @default(3) @map("auto_report_detail_level")
+  departmentOrdering    String   @default("manual") @map("department_ordering")
+  biweeklyStartDate     DateTime? @map("biweekly_start_date")
   createdAt             DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -63,6 +67,8 @@ model Department {
   headUserId         String?   @map("head_user_id")
   color              String?
   sortOrder          Int       @default(0) @map("sort_order")
+  reportPriority     Int       @default(5) @map("report_priority")
+  reportOrder        Int       @default(0) @map("report_order")
   createdAt          DateTime  @default(now()) @map("created_at")
   archivedAt         DateTime? @map("archived_at")
 
@@ -70,9 +76,10 @@ model Department {
   parent         Department?  @relation("SubDepartments", fields: [parentDepartmentId], references: [id])
   subDepartments Department[] @relation("SubDepartments")
   headUser       User?        @relation("DepartmentHead", fields: [headUserId], references: [id])
-  members        DepartmentMember[]
-  levelConfigs   DepartmentLevelConfig[]
-  reportsTo      ReportsTo[]
+  members              DepartmentMember[]
+  levelConfigs         DepartmentLevelConfig[]
+  reportsTo            ReportsTo[]
+  executiveOversight   ExecutiveDepartment[]
 
   @@map("departments")
 }
@@ -89,7 +96,12 @@ model User {
   role            UserRole @default(member)
   level               Int?
   isLead              Boolean  @default(false) @map("is_lead")
+  executiveTier       Int?     @map("executive_tier")
   isReportingActive   Boolean  @default(true) @map("is_reporting_active")
+  reportCadence       String   @default("daily") @map("report_cadence")
+  reportDueDays       Json     @default("[5]") @map("report_due_days")
+  reportDueTime       String   @default("17:00") @map("report_due_time")
+  reportBiweeklyWeek  String   @default("A") @map("report_biweekly_week")
   submissionToken     String   @unique @map("submission_token") @default(cuid())
   createdAt       DateTime @default(now()) @map("created_at")
 
@@ -106,9 +118,25 @@ model User {
   reportsToManagers     ReportsTo[]        @relation("SubordinateReports")
   reportsToSubs         ReportsTo[]        @relation("ManagerReports")
   canonicalNarrative    CanonicalNarrative?
+  executiveDepartments  ExecutiveDepartment[]
 
   @@unique([orgId, email])
   @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// ExecutiveDepartment — which depts an executive oversees
+// ─────────────────────────────────────────────
+model ExecutiveDepartment {
+  id           String @id @default(cuid())
+  userId       String @map("user_id")
+  departmentId String @map("department_id")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+  @@map("executive_departments")
 }
 
 enum UserRole {
@@ -201,12 +229,14 @@ model ParsedReport {
   reportId        String   @unique @map("report_id")
   userId          String   @map("user_id")
   date            DateTime
-  aiSummary       String?  @map("ai_summary")
-  structuredData  Json?    @map("structured_data")
-  totalHours      Decimal? @map("total_hours") @db.Decimal(5, 2)
-  notes           String?
-  blockers        String?
-  createdAt       DateTime @default(now()) @map("created_at")
+  aiSummary        String?  @map("ai_summary")
+  structuredData   Json?    @map("structured_data")
+  totalHours       Decimal? @map("total_hours") @db.Decimal(5, 2)
+  notes            String?
+  blockers         String?
+  visualPageUrls   Json?    @map("visual_page_urls")
+  parsedWithVision Boolean  @default(false) @map("parsed_with_vision")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   report        Report          @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -387,6 +417,5 @@ model DailySummary {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  @@unique([orgId, summaryDate])
   @@map("daily_summaries")
 }

@@ -203,7 +203,7 @@ export default async function DashboardPage() {
             </p>
           </div>
         ) : (
-          <OrgChartFlow departments={deptNodes} orgName={org?.name ?? "Organization"} />
+          <OrgChartFlow departments={deptNodes} orgName={org?.name ?? "Organization"} orgId={user.orgId} />
         )}
       </div>
 

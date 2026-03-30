@@ -51,10 +51,10 @@ export default function SubmitUpload({ token, accentColor }: Props) {
 
     try {
       const res = await fetch(`/api/submit/${token}`, { method: "POST", body: fd });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error ?? "Upload failed. Please try again.");
+        setError(data.error ?? `Upload failed (${res.status}). Please try again.`);
         setUploading(false);
         return;
       }

@@ -10,6 +10,8 @@ const updateSchema = z.object({
   headUserId: z.string().nullable().optional(),
   color: z.string().nullable().optional(),
   sortOrder: z.number().optional(),
+  reportPriority: z.number().int().min(1).max(10).optional(),
+  reportOrder: z.number().int().optional(),
 });
 
 interface Params { params: Promise<{ orgId: string; id: string }> }

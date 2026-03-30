@@ -4,6 +4,7 @@ import { getWorkspaceUser } from "@/lib/auth";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 
+export const maxDuration = 60;
 interface Params { params: Promise<{ orgId: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -13,26 +14,36 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const summary = await prisma.dailySummary.findFirst({
     where: { orgId },
-    orderBy: { summaryDate: "desc" },
+    orderBy: { createdAt: "desc" },
   });
 
   return NextResponse.json(summary ?? null);
 }
 
 export async function POST(_req: NextRequest, { params }: Params) {
-  const { orgId } = await params;
+  try { return await handleSummaryPost(await params); }
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("Summary POST error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+async function handleSummaryPost({ orgId }: { orgId: string }) {
   const user = await getWorkspaceUser(orgId);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.role === "member") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true } } },
+    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true } } },
   });
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const apiKey = org.workspaceSettings?.anthropicApiKey ?? null;
   const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
+  const reportDetailLevel = org.workspaceSettings?.reportDetailLevel ?? 3;
+  const departmentOrdering = org.workspaceSettings?.departmentOrdering ?? "manual";
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -62,10 +73,19 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const userIds = activeUsers.map((u) => u.id);
 
+  // Fetch department ordering for the summary
+  const deptOrder = departmentOrdering === "manual"
+    ? await prisma.department.findMany({
+        where: { orgId, archivedAt: null },
+        orderBy: [{ reportOrder: "asc" }, { name: "asc" }],
+        select: { name: true, reportOrder: true },
+      })
+    : [];
+
   const [todayReports, narratives, recentAlerts] = await Promise.all([
     prisma.parsedReport.findMany({
       where: { userId: { in: userIds }, date: { gte: today, lt: tomorrow } },
-      select: { userId: true, aiSummary: true, date: true },
+      select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
     }),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
     prisma.alert.findMany({
@@ -80,12 +100,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const narrativeByUser = new Map(narratives.map((n) => [n.userId, n]));
   const missingIds = userIds.filter((id) => !todayByUser.has(id));
 
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   const standInReports = missingIds.length > 0
     ? await prisma.parsedReport.findMany({
-        where: { userId: { in: missingIds }, date: { lt: today } },
+        where: { userId: { in: missingIds }, date: { lt: today, gte: thirtyDaysAgo } },
         orderBy: { date: "desc" },
         distinct: ["userId"],
-        select: { userId: true, aiSummary: true, date: true },
+        select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
       })
     : [];
 
@@ -126,10 +149,41 @@ export async function POST(_req: NextRequest, { params }: Params) {
       ? Math.floor((today.getTime() - new Date(activeReport.date).getTime()) / (1000 * 60 * 60 * 24))
       : -1;
 
+    // For detail level 3+, build a rich narrative from structured task data if available
+    let builtNarrative = narrative?.currentNarrative ?? activeReport?.aiSummary ?? "No report data available.";
+
+    if (reportDetailLevel >= 3 && activeReport?.structuredData) {
+      const sd = activeReport.structuredData as {
+        summary?: string;
+        tasks?: { description: string; status: string; hoursToday?: number | null; projectName?: string | null }[];
+        notes?: string | null;
+        blockers?: string | null;
+        totalHours?: number | null;
+      };
+
+      if (sd.tasks && sd.tasks.length > 0) {
+        const taskLines = sd.tasks.map((t) => {
+          const hrs = t.hoursToday != null ? ` [${t.hoursToday}h]` : "";
+          const proj = t.projectName ? ` — ${t.projectName}` : "";
+          return `• ${t.description}${proj}${hrs} (${t.status})`;
+        }).join("\n");
+
+        builtNarrative = [
+          sd.summary ?? activeReport.aiSummary ?? "",
+          "",
+          "Tasks:",
+          taskLines,
+          sd.notes ? `\nNotes: ${sd.notes}` : "",
+          sd.blockers ? `\nBlockers: ${sd.blockers}` : "",
+          sd.totalHours != null ? `\nTotal hours: ${sd.totalHours}` : "",
+        ].filter((l) => l !== "").join("\n").trim();
+      }
+    }
+
     return {
       name: u.name,
       department: u.departmentMemberships[0]?.department?.name ?? "Unassigned",
-      narrative: narrative?.currentNarrative ?? activeReport?.aiSummary ?? "No report data available.",
+      narrative: builtNarrative,
       riskSignals: (narrative?.riskSignals as string[]) ?? [],
       reportDate,
       isStandIn,
@@ -144,12 +198,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
     completenessScore,
     people,
     alerts: recentAlerts.map((a) => a.message),
+    reportDetailLevel,
+    departmentOrdering,
+    departmentOrder: deptOrder.map((d) => d.name),
   });
 
-  // Upsert today's summary
-  const saved = await prisma.dailySummary.upsert({
-    where: { orgId_summaryDate: { orgId, summaryDate: today } },
-    create: {
+  // Always create a new record so regeneration produces a distinct timestamped entry
+  const saved = await prisma.dailySummary.create({
+    data: {
       orgId,
       summaryDate: today,
       aiFullSummary: summaryText,
@@ -157,18 +213,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
       missingSubmissions: activeUsers.length - freshCount,
       alertCount: recentAlerts.length,
     },
-    update: {
-      aiFullSummary: summaryText,
-      totalSubmissions: freshCount,
-      missingSubmissions: activeUsers.length - freshCount,
-      alertCount: recentAlerts.length,
-    },
   });
 
-  // Prune to keep only the 30 most recent summaries for this org
+  // Prune to keep only the 30 most recently generated summaries for this org
   const oldest = await prisma.dailySummary.findMany({
     where: { orgId },
-    orderBy: { summaryDate: "desc" },
+    orderBy: { createdAt: "desc" },
     skip: 30,
     select: { id: true },
   });
@@ -176,21 +226,36 @@ export async function POST(_req: NextRequest, { params }: Params) {
     await prisma.dailySummary.deleteMany({ where: { id: { in: oldest.map((s) => s.id) } } });
   }
 
-  // Email the summary to the workspace owner — non-fatal if it fails
+  // Email the summary to the workspace owner
+  let emailSent = false;
+  let emailTo: string | null = null;
+  let emailError: string | null = null;
+
   if (org.ownerEmail && process.env.RESEND_API_KEY) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
-    sendSummaryEmail({
-      toEmail: org.ownerEmail,
-      orgName: org.name,
-      summaryDate: today,
-      summaryId: saved.id,
-      orgId,
-      totalSubmissions: saved.totalSubmissions,
-      missingSubmissions: saved.missingSubmissions,
-      markdown: saved.aiFullSummary!,
-      appUrl,
-    }).catch((e) => console.error("Summary email failed:", e));
+    emailTo = org.ownerEmail;
+    try {
+      await sendSummaryEmail({
+        toEmail: org.ownerEmail,
+        orgName: org.name,
+        summaryDate: today,
+        summaryId: saved.id,
+        orgId,
+        totalSubmissions: saved.totalSubmissions,
+        missingSubmissions: saved.missingSubmissions,
+        markdown: saved.aiFullSummary!,
+        appUrl,
+      });
+      emailSent = true;
+      console.log(`[Summary] Email sent to ${org.ownerEmail} for org ${org.name} (${orgId})`);
+    } catch (emailErr) {
+      emailError = emailErr instanceof Error ? emailErr.message : String(emailErr);
+      console.error(`[Summary] Email failed for ${org.ownerEmail}:`, emailError);
+    }
+  } else {
+    if (!org.ownerEmail) { emailError = "No owner email on org"; console.warn("[Summary] No ownerEmail on org — skipping email"); }
+    if (!process.env.RESEND_API_KEY) { emailError = "RESEND_API_KEY not configured"; console.warn("[Summary] RESEND_API_KEY not set — skipping email"); }
   }
 
-  return NextResponse.json({ id: saved.id, summary: saved.aiFullSummary, generatedAt: saved.createdAt });
+  return NextResponse.json({ id: saved.id, summary: saved.aiFullSummary, generatedAt: saved.createdAt, emailSent, emailTo, emailError });
 }

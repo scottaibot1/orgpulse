@@ -53,6 +53,7 @@ interface Props {
   editing: UserWithDepartments | null;
   orgId: string;
   canToggleReporting?: boolean;
+  isAdmin?: boolean;
 }
 
 function getLevelLabel(lvl: number, configs: LevelConfig[]): string {
@@ -60,7 +61,7 @@ function getLevelLabel(lvl: number, configs: LevelConfig[]): string {
   return (config?.levelTitle?.trim()) ? config.levelTitle.trim() : `Level ${lvl}`;
 }
 
-export default function WorkspacePersonDialog({ open, onClose, onSaved, editing, orgId, canToggleReporting = true }: Props) {
+export default function WorkspacePersonDialog({ open, onClose, onSaved, editing, orgId, canToggleReporting = true, isAdmin = false }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<DeptWithLevels[]>([]);
@@ -70,6 +71,13 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
   const [reportsToIds, setReportsToIds] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<OrgUser[]>([]);
   const [isReportingActive, setIsReportingActive] = useState(true);
+  const [executiveTier, setExecutiveTier] = useState<1 | 2 | null>(null);
+  const [executiveDepartmentIds, setExecutiveDepartmentIds] = useState<string[]>([]);
+  const [reportCadence, setReportCadence] = useState<"daily" | "weekly" | "biweekly" | "monthly" | "custom">("daily");
+  const [reportDueDays, setReportDueDays] = useState<number[]>([5]);
+  const [reportDueTime, setReportDueTime] = useState("17:00");
+  const [reportBiweeklyWeek, setReportBiweeklyWeek] = useState<"A" | "B">("A");
+  const [editEmail, setEditEmail] = useState("");
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -91,6 +99,7 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
     if (open) {
       setError(null);
       if (editing) {
+        setEditEmail(editing.email);
         reset({ name: editing.name, email: editing.email, title: editing.title ?? "", role: editing.role });
         const ids = editing.departmentMemberships.map((m) => m.departmentId);
         setSelectedDeptIds(ids);
@@ -100,13 +109,27 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
         const existingManagers = ((editing as UserWithDepartments & { reportsToManagers?: { managerUserId: string }[] }).reportsToManagers ?? []).map((r) => r.managerUserId);
         setReportsToIds(existingManagers);
         setIsReportingActive((editing as UserWithDepartments & { isReportingActive?: boolean }).isReportingActive ?? true);
+        const e2 = editing as UserWithDepartments & { reportCadence?: string; reportDueDays?: number[]; reportDueTime?: string; reportBiweeklyWeek?: string; executiveTier?: number | null; executiveDepartments?: { departmentId: string }[] };
+        setExecutiveTier((e2.executiveTier as 1 | 2 | null) ?? null);
+        setExecutiveDepartmentIds(e2.executiveDepartments?.map((d) => d.departmentId) ?? []);
+        setReportCadence((e2.reportCadence as "daily" | "weekly" | "biweekly" | "monthly" | "custom") ?? "daily");
+        setReportDueDays(e2.reportDueDays ?? [5]);
+        setReportDueTime(e2.reportDueTime ?? "17:00");
+        setReportBiweeklyWeek((e2.reportBiweeklyWeek as "A" | "B") ?? "A");
       } else {
+        setEditEmail("");
         reset({ name: "", email: "", title: "", role: "member" });
         setSelectedDeptIds([]);
         setPrimaryDeptId("");
         setLevel(null);
         setReportsToIds([]);
         setIsReportingActive(true);
+        setExecutiveTier(null);
+        setExecutiveDepartmentIds([]);
+        setReportCadence("daily");
+        setReportDueDays([5]);
+        setReportDueTime("17:00");
+        setReportBiweeklyWeek("A");
       }
     }
   }, [open, editing, reset]);
@@ -151,11 +174,19 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
 
     const payload = {
       ...data,
+      // In edit mode, use the controlled editEmail state (admin can change, non-admin keeps original)
+      ...(editing ? { email: editEmail } : {}),
       level,
       departmentIds: selectedDeptIds,
       primaryDepartmentId: primaryDeptId,
       reportsToIds,
       isReportingActive,
+      reportCadence,
+      reportDueDays,
+      reportDueTime,
+      reportBiweeklyWeek,
+      executiveTier,
+      executiveDepartmentIds: executiveTier ? executiveDepartmentIds : [],
     };
 
     const url = editing ? `/api/w/${orgId}/users/${editing.id}` : `/api/w/${orgId}/users`;
@@ -199,9 +230,22 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
 
           <div className="space-y-2">
             <Label htmlFor="email">Email *</Label>
-            <Input id="email" type="email" placeholder="jane@company.com" {...register("email")} disabled={!!editing} />
-            {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
-            {editing && <p className="text-xs text-gray-400">Email cannot be changed after creation</p>}
+            {editing ? (
+              <>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                />
+                <p className="text-xs text-gray-400">Only admins can change email addresses.</p>
+              </>
+            ) : (
+              <>
+                <Input id="email" type="email" placeholder="jane@company.com" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -226,9 +270,90 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
             </Select>
           </div>
 
+          {/* Executive Tier */}
+          <div className="space-y-2">
+            <Label>Executive Tier</Label>
+            <div className="flex gap-2">
+              {([null, 1, 2] as const).map((tier) => (
+                <button
+                  key={String(tier)}
+                  type="button"
+                  onClick={() => {
+                    setExecutiveTier(tier);
+                    if (tier !== null) {
+                      setIsReportingActive(false);
+                      if (executiveDepartmentIds.length === 0) {
+                        setExecutiveDepartmentIds(departments.map((d) => d.id));
+                      }
+                    } else {
+                      setIsReportingActive(true);
+                    }
+                  }}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                    executiveTier === tier
+                      ? "bg-amber-50 border-amber-300 text-amber-800 font-semibold"
+                      : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                  }`}
+                >
+                  {tier === null ? "None" : tier === 1 ? "Exec Tier 1" : "Exec Tier 2"}
+                </button>
+              ))}
+            </div>
+            {executiveTier !== null && (
+              <div className="space-y-1.5 mt-2">
+                <Label className="text-xs text-gray-500">Departments this executive oversees</Label>
+                <div className="flex flex-wrap gap-1.5 p-2 border rounded-md max-h-32 overflow-y-auto">
+                  {departments.length === 0 ? (
+                    <p className="text-xs text-gray-400">No departments yet</p>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setExecutiveDepartmentIds(departments.map((d) => d.id))}
+                        className="text-xs text-blue-600 hover:underline mr-1"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExecutiveDepartmentIds([])}
+                        className="text-xs text-slate-400 hover:underline mr-2"
+                      >
+                        None
+                      </button>
+                      {departments.map((d) => {
+                        const checked = executiveDepartmentIds.includes(d.id);
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() =>
+                              setExecutiveDepartmentIds((prev) =>
+                                prev.includes(d.id) ? prev.filter((id) => id !== d.id) : [...prev, d.id]
+                              )
+                            }
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                              checked
+                                ? "bg-amber-100 border-amber-300 text-amber-800"
+                                : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-sm border ${checked ? "bg-amber-400 border-amber-400" : "border-gray-300"}`} />
+                            {d.name}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">{executiveDepartmentIds.length} of {departments.length} departments selected</p>
+              </div>
+            )}
+          </div>
+
           {/* Reporting Active toggle */}
           {canToggleReporting && (
-            <div className="flex items-start justify-between gap-4 py-1">
+            <div className={`flex items-start justify-between gap-4 py-1 ${executiveTier !== null ? "opacity-40 pointer-events-none" : ""}`}>
               <div>
                 <Label className="text-sm font-medium text-gray-900">Reporting Active</Label>
                 <p className="text-xs text-gray-500 mt-0.5">
@@ -248,6 +373,135 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
                   }`}
                 />
               </button>
+            </div>
+          )}
+
+          {/* Reporting Schedule */}
+          {canToggleReporting && (
+            <div className={`space-y-3 border-t pt-3 ${executiveTier !== null ? "opacity-40 pointer-events-none" : ""}`}>
+              <Label className="text-sm font-medium text-gray-900">Reporting Schedule</Label>
+
+              {/* Cadence selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-gray-500">Cadence</Label>
+                <Select
+                  value={reportCadence}
+                  onValueChange={(v) => {
+                    setReportCadence(v as typeof reportCadence);
+                    if (v === "daily") setReportDueDays([]);
+                    else if (v === "weekly" || v === "biweekly") setReportDueDays([5]);
+                    else if (v === "monthly") setReportDueDays([1]);
+                    else if (v === "custom") setReportDueDays([5]);
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="biweekly">Biweekly (every other week)</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="custom">Custom days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Day picker for weekly / biweekly / custom */}
+              {(reportCadence === "weekly" || reportCadence === "biweekly" || reportCadence === "custom") && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">
+                    {reportCadence === "custom" ? "Days of week" : "Day of week"}
+                  </Label>
+                  <div className="flex gap-1 flex-wrap">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => {
+                      const selected = reportDueDays.includes(idx);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            if (reportCadence === "custom") {
+                              setReportDueDays((prev) =>
+                                prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx]
+                              );
+                            } else {
+                              setReportDueDays([idx]);
+                            }
+                          }}
+                          className={`px-2 py-1 rounded text-xs border transition-colors ${
+                            selected
+                              ? "bg-blue-100 border-blue-300 text-blue-800"
+                              : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Day of month for monthly */}
+              {reportCadence === "monthly" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">Day of month</Label>
+                  <Select
+                    value={String(reportDueDays[0] ?? 1)}
+                    onValueChange={(v) => setReportDueDays([parseInt(v ?? "1")])}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <SelectItem key={d} value={String(d)}>Day {d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Week A/B for biweekly */}
+              {reportCadence === "biweekly" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500">Which week</Label>
+                  <div className="flex gap-2">
+                    {(["A", "B"] as const).map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setReportBiweeklyWeek(w)}
+                        className={`px-4 py-1 rounded text-sm border transition-colors ${
+                          reportBiweeklyWeek === w
+                            ? "bg-blue-100 border-blue-300 text-blue-800"
+                            : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        Week {w}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Due time */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-gray-500">Due by</Label>
+                <input
+                  type="time"
+                  value={reportDueTime}
+                  onChange={(e) => setReportDueTime(e.target.value)}
+                  className="block w-full h-9 px-3 py-1 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Human-readable summary */}
+              <p className="text-xs text-gray-400">
+                {reportCadence === "daily" && `Due every day by ${reportDueTime}`}
+                {reportCadence === "weekly" && reportDueDays.length > 0 && `Due every ${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][reportDueDays[0]]} by ${reportDueTime}`}
+                {reportCadence === "biweekly" && reportDueDays.length > 0 && `Due every other ${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][reportDueDays[0]]} (Week ${reportBiweeklyWeek}) by ${reportDueTime}`}
+                {reportCadence === "monthly" && reportDueDays.length > 0 && `Due on the ${reportDueDays[0]}${["th","st","nd","rd"][Math.min(reportDueDays[0] % 10, 3)] ?? "th"} of each month by ${reportDueTime}`}
+                {reportCadence === "custom" && reportDueDays.length > 0 && `Due on ${reportDueDays.sort((a,b)=>a-b).map((d)=>["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")} by ${reportDueTime}`}
+                {reportCadence === "custom" && reportDueDays.length === 0 && "Select at least one day"}
+              </p>
             </div>
           )}
 

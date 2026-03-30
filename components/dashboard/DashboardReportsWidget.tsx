@@ -16,22 +16,16 @@ export interface ReportRow {
   departmentColor: string | null;
 }
 
-type SortKey = "userName" | "departmentName" | "submittedAt" | "source";
+type SortKey = "userName" | "departmentName" | "submittedAt";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 4;
 
 interface Props {
   reports: ReportRow[];
   orgId: string;
   accentColor: string;
 }
-
-const SOURCE_LABELS: Record<string, string> = {
-  form: "Form",
-  pdf_upload: "PDF",
-  email: "Email",
-};
 
 export default function DashboardReportsWidget({ reports, orgId, accentColor }: Props) {
   const [search, setSearch] = useState("");
@@ -52,12 +46,10 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return reports;
-    return reports.filter((r) => {
-      return (
-        r.userName.toLowerCase().includes(q) ||
-        new Date(r.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toLowerCase().includes(q)
-      );
-    });
+    return reports.filter((r) =>
+      r.userName.toLowerCase().includes(q) ||
+      new Date(r.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toLowerCase().includes(q)
+    );
   }, [reports, search]);
 
   const sorted = useMemo(() => {
@@ -69,8 +61,6 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
         cmp = a.userName.localeCompare(b.userName);
       } else if (sortKey === "departmentName") {
         cmp = a.departmentName.localeCompare(b.departmentName);
-      } else if (sortKey === "source") {
-        cmp = a.source.localeCompare(b.source);
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -80,28 +70,34 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
   const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronUp className="h-3 w-3 opacity-20" />;
+    if (sortKey !== col) return <ChevronUp className="h-2.5 w-2.5 opacity-20" />;
     return sortDir === "asc"
-      ? <ChevronUp className="h-3 w-3" style={{ color: accentColor }} />
-      : <ChevronDown className="h-3 w-3" style={{ color: accentColor }} />;
+      ? <ChevronUp className="h-2.5 w-2.5" style={{ color: accentColor }} />
+      : <ChevronDown className="h-2.5 w-2.5" style={{ color: accentColor }} />;
   }
+
+  const COL_LABELS: Record<SortKey, string> = {
+    userName: "Name",
+    departmentName: "Department",
+    submittedAt: "Date & Time",
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-card flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Reports</h2>
-          <p className="text-xs text-slate-400 mt-0.5">{reports.length} total submissions</p>
+          <h2 className="text-sm font-semibold text-slate-900">Reports</h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">{reports.length} total</p>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
           <input
             type="text"
-            placeholder="Search name or date…"
+            placeholder="Search…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 w-44"
+            className="pl-7 pr-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 w-36"
             style={{ "--tw-ring-color": accentColor } as React.CSSProperties}
           />
         </div>
@@ -109,28 +105,28 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
-              {(["userName", "departmentName", "submittedAt", "source"] as SortKey[]).map((col) => (
+              {(["userName", "departmentName", "submittedAt"] as SortKey[]).map((col) => (
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
-                  className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700 select-none whitespace-nowrap"
+                  className="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700 select-none whitespace-nowrap"
                 >
-                  <span className="flex items-center gap-1">
-                    {col === "userName" ? "Name" : col === "departmentName" ? "Department" : col === "submittedAt" ? "Date" : "Source"}
+                  <span className="flex items-center gap-0.5">
+                    {COL_LABELS[col]}
                     <SortIcon col={col} />
                   </span>
                 </th>
               ))}
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">View</th>
+              <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide">View</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400 text-sm">
+                <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
                   {search ? "No reports match your search." : "No reports yet."}
                 </td>
               </tr>
@@ -138,52 +134,48 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
               paginated.map((row) => {
                 const initials = row.userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
                 const isPdf = row.source === "pdf_upload";
+                const dt = new Date(row.submittedAt);
+                const dateStr = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
                 return (
                   <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
                         <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
                           style={{ background: row.departmentColor ? `linear-gradient(135deg,${row.departmentColor},${row.departmentColor}cc)` : `linear-gradient(135deg,${accentColor},${accentColor}cc)` }}
                         >
                           {initials}
                         </div>
-                        <span className="font-medium text-slate-800 truncate max-w-[120px]">{row.userName}</span>
+                        <span className="font-medium text-slate-800 truncate max-w-[100px]">{row.userName}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-500 truncate max-w-[100px] block">{row.departmentName || "—"}</span>
+                    <td className="px-3 py-2">
+                      <span className="text-slate-500 truncate max-w-[80px] block">{row.departmentName || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {new Date(row.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className="text-slate-700">{dateStr}</span>
+                      <span className="text-slate-400 ml-1">{timeStr}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
-                        isPdf ? "bg-orange-50 text-orange-600" : row.source === "email" ? "bg-sky-50 text-sky-600" : "bg-emerald-50 text-emerald-600"
-                      }`}>
-                        {isPdf && <FileDown className="h-3 w-3" />}
-                        {SOURCE_LABELS[row.source]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       {isPdf && row.rawPdfUrl ? (
                         <a
                           href={row.rawPdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium hover:opacity-80"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium hover:opacity-80"
                           style={{ color: accentColor }}
                         >
-                          <FileDown className="h-3.5 w-3.5" />
+                          <FileDown className="h-3 w-3" />
                           PDF
                         </a>
                       ) : (
                         <Link
                           href={`/w/${orgId}/people/${row.userId}`}
-                          className="inline-flex items-center gap-1 text-xs font-medium hover:opacity-80"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium hover:opacity-80"
                           style={{ color: accentColor }}
                         >
-                          <FileText className="h-3.5 w-3.5" />
+                          <FileText className="h-3 w-3" />
                           View
                         </Link>
                       )}
@@ -197,25 +189,25 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-xs text-slate-500">
+      <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-[11px] text-slate-500">
         <span>
           {sorted.length === 0 ? "0 results" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, sorted.length)} of ${sorted.length}`}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <span className="px-2">{page} / {totalPages}</span>
+          <span className="px-1.5">{page}/{totalPages}</span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { extractTextFromBuffer } from "@/lib/extract-text";
-import { extractReportData, updateCanonicalNarrative, type ExtractedReportData } from "@/lib/ai";
+import { extractReportData, extractReportDataFromPdf, getPdfPageCount, updateCanonicalNarrative, type ExtractedReportData } from "@/lib/ai";
+import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -21,17 +22,37 @@ const ALLOWED_TYPES = [
   "text/plain",
 ];
 
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_PDF_PAGES = 50;
+
+export const maxDuration = 60;
+
 interface Params { params: Promise<{ token: string }> }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const { token } = await params;
+  try { return await handlePost(request, params); }
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("Submit route unhandled error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+async function handlePost(request: NextRequest, params: { token: string } | Promise<{ token: string }>) {
+  const { token } = await params as { token: string };
 
   // Look up user by submission token
   const user = await prisma.user.findUnique({
     where: { submissionToken: token },
     select: {
       id: true, name: true, orgId: true, isReportingActive: true,
-      organization: { select: { workspaceSettings: { select: { anthropicApiKey: true } } } },
+      organization: {
+        select: {
+          workspaceSettings: {
+            select: { anthropicApiKey: true, reportDetailLevel: true }
+          }
+        }
+      },
     },
   });
 
@@ -47,11 +68,27 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!ALLOWED_TYPES.includes(file.type) && !file.name.match(/\.(pdf|docx?|pptx?|xlsx?|txt|md)$/i)) {
     return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
   }
-  if (file.size > 20 * 1024 * 1024) {
-    return NextResponse.json({ error: "File too large (max 20MB)" }, { status: 400 });
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: "File too large (max 25MB)" }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  const reportDetailLevel = user.organization?.workspaceSettings?.reportDetailLevel ?? 3;
+
+  // PDF page count enforcement
+  if (isPdf) {
+    try {
+      const pageCount = await getPdfPageCount(buffer);
+      if (pageCount > MAX_PDF_PAGES) {
+        return NextResponse.json({
+          error: `PDF has ${pageCount} pages. Maximum allowed is ${MAX_PDF_PAGES} pages. Please split your document and resubmit.`
+        }, { status: 422 });
+      }
+    } catch {
+      // Continue if page counting fails — Claude will handle it
+    }
+  }
 
   // Upload to Supabase Storage
   const filename = `${user.orgId}/${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -61,33 +98,59 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   if (uploadError) {
     console.error("Supabase upload error:", uploadError);
-    return NextResponse.json({ error: "File upload failed" }, { status: 500 });
+    return NextResponse.json({ error: `File upload failed: ${uploadError.message}` }, { status: 500 });
   }
 
   const { data: { publicUrl } } = supabase.storage.from("reports").getPublicUrl(filename);
 
   const apiKey = user.organization?.workspaceSettings?.anthropicApiKey ?? null;
 
-  // Extract text
-  let rawText: string;
-  try {
-    rawText = await extractTextFromBuffer(buffer, file.type, file.name);
-  } catch (e) {
-    console.error("Text extraction error:", e);
-    return NextResponse.json({ error: "Could not read file contents" }, { status: 422 });
-  }
-
-  if (!rawText || rawText.length < 10) {
-    return NextResponse.json({ error: "File appears to be empty or unreadable" }, { status: 422 });
-  }
-
-  // AI extraction
+  // AI extraction — PDFs go directly to Claude, everything else gets text-extracted first
   let extracted: ExtractedReportData;
+  let rawText = "";
   try {
-    extracted = await extractReportData(rawText, apiKey);
+    if (isPdf) {
+      extracted = await extractReportDataFromPdf(buffer, apiKey);
+    } else {
+      rawText = await extractTextFromBuffer(buffer, file.type, file.name);
+      if (!rawText || rawText.length < 10) {
+        return NextResponse.json({ error: "File appears to be empty or unreadable" }, { status: 422 });
+      }
+      extracted = await extractReportData(rawText, apiKey);
+    }
   } catch (e) {
-    console.error("AI extraction error:", e);
-    return NextResponse.json({ error: "AI processing failed" }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("Extraction error:", msg);
+    return NextResponse.json({ error: `Processing failed: ${msg}` }, { status: 500 });
+  }
+
+  // At detail level 5: extract and store visually significant PDF pages
+  let visualPageUrls: string[] = [];
+  if (isPdf && reportDetailLevel >= 5 && extracted.pages && extracted.pages.length > 0) {
+    const visualPages = extracted.pages.filter((p) => p.includeVisual);
+    if (visualPages.length > 0) {
+      try {
+        const srcDoc = await PDFDocument.load(buffer);
+        const visualDoc = await PDFDocument.create();
+        const pageIndices = visualPages.map((p) => p.pageNumber - 1).filter((i) => i >= 0 && i < srcDoc.getPageCount());
+        if (pageIndices.length > 0) {
+          const pages = await visualDoc.copyPages(srcDoc, pageIndices);
+          pages.forEach((p) => visualDoc.addPage(p));
+          const visualBuffer = Buffer.from(await visualDoc.save());
+          const visualFilename = `${user.orgId}/${user.id}/visual-${Date.now()}.pdf`;
+          const { error: visualUploadError } = await supabase.storage
+            .from("reports")
+            .upload(visualFilename, visualBuffer, { contentType: "application/pdf", upsert: false });
+          if (!visualUploadError) {
+            const { data: { publicUrl: visualUrl } } = supabase.storage.from("reports").getPublicUrl(visualFilename);
+            visualPageUrls = [visualUrl];
+          }
+        }
+      } catch (e) {
+        console.error("Visual page extraction error:", e);
+        // Non-fatal — continue without visual pages
+      }
+    }
   }
 
   const today = new Date();
@@ -115,6 +178,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       notes: extracted.notes,
       blockers: extracted.blockers,
       totalHours: extracted.totalHours ?? null,
+      parsedWithVision: isPdf,
+      visualPageUrls: visualPageUrls.length > 0 ? visualPageUrls : Prisma.JsonNull,
     },
   });
 
@@ -135,17 +200,20 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
   }
 
-  // Update CanonicalNarrative
-  try {
+  // Update CanonicalNarrative — fire and forget, non-blocking
+  (async () => { try {
     const existing = await prisma.canonicalNarrative.findUnique({
       where: { userId: user.id },
     });
 
-    // Get last 3 recent parsed reports for context
+    // Get last 30 days of parsed reports for context
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const recentParsed = await prisma.parsedReport.findMany({
-      where: { userId: user.id, id: { not: parsedReport.id } },
+      where: { userId: user.id, id: { not: parsedReport.id }, date: { gte: thirtyDaysAgo } },
       orderBy: { date: "desc" },
-      take: 3,
+      take: 10,
       select: { structuredData: true },
     });
 
@@ -181,9 +249,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       },
     });
   } catch (e) {
-    // Narrative update failure is non-fatal
     console.error("Narrative update error:", e);
-  }
+  } })();
 
   return NextResponse.json({ reportId: report.id, summary: extracted.summary }, { status: 201 });
 }
