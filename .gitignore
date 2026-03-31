@@ -30,6 +30,10 @@ yarn-error.log*
 
 # vercel
 .vercel
+.env.vercel
+
+# cache files
+.cache-*
 
 # Claude Code IDE settings
 .claude/
