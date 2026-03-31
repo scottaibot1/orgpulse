@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { FileText, FileDown, ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, FileDown, ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
 export interface ReportRow {
   id: string;
@@ -27,11 +27,26 @@ interface Props {
   accentColor: string;
 }
 
-export default function DashboardReportsWidget({ reports, orgId, accentColor }: Props) {
+export default function DashboardReportsWidget({ reports: initialReports, orgId, accentColor }: Props) {
+  const [rows, setRows] = useState<ReportRow[]>(initialReports);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("submittedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(reportId: string) {
+    setDeleting(reportId);
+    try {
+      const res = await fetch(`/api/w/${orgId}/reports/${reportId}`, { method: "DELETE" });
+      if (res.ok) {
+        setRows((prev) => prev.filter((r) => r.id !== reportId));
+        setPage((p) => Math.max(1, p));
+      }
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -45,12 +60,12 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return reports;
-    return reports.filter((r) =>
+    if (!q) return rows;
+    return rows.filter((r) =>
       r.userName.toLowerCase().includes(q) ||
       new Date(r.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toLowerCase().includes(q)
     );
-  }, [reports, search]);
+  }, [rows, search]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -88,7 +103,7 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Reports</h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">{reports.length} total</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{rows.length} total</p>
         </div>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
@@ -121,12 +136,13 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
                 </th>
               ))}
               <th className="px-3 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide">View</th>
+              <th className="px-3 py-2 w-8"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
                   {search ? "No reports match your search." : "No reports yet."}
                 </td>
               </tr>
@@ -179,6 +195,16 @@ export default function DashboardReportsWidget({ reports, orgId, accentColor }: 
                           View
                         </Link>
                       )}
+                    </td>
+                    <td className="px-2 py-2">
+                      <button
+                        onClick={() => handleDelete(row.id)}
+                        disabled={deleting === row.id}
+                        className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                        title="Delete report"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </td>
                   </tr>
                 );
