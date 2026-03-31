@@ -8,10 +8,11 @@ import ReactFlow, {
   type Node,
   type Edge,
   type NodeProps,
+  type ReactFlowInstance,
   Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface PersonNode {
@@ -233,6 +234,10 @@ function DeptCardNode({ data }: NodeProps) {
 const nodeTypes = { personCard: PersonCardNode, deptCard: DeptCardNode, execCard: ExecutiveCardNode };
 
 export default function OrgChartFlow({ departments, executives = [], orgName, orgId, compact = false }: Props) {
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    setTimeout(() => instance.fitView({ padding: 0.12 }), 50);
+  }, []);
+
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -479,6 +484,7 @@ export default function OrgChartFlow({ departments, executives = [], orgName, or
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.12 }}
+        onInit={onInit}
         nodesDraggable={false}
         nodesConnectable={false}
         zoomOnScroll={false}
