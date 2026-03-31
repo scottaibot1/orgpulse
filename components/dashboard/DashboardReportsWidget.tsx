@@ -36,13 +36,18 @@ export default function DashboardReportsWidget({ reports: initialReports, orgId,
   const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleDelete(reportId: string) {
+    const removed = rows.find((r) => r.id === reportId);
     setDeleting(reportId);
+    // Optimistic: remove immediately
+    setRows((prev) => prev.filter((r) => r.id !== reportId));
     try {
       const res = await fetch(`/api/w/${orgId}/reports/${reportId}`, { method: "DELETE" });
-      if (res.ok) {
-        setRows((prev) => prev.filter((r) => r.id !== reportId));
-        setPage((p) => Math.max(1, p));
+      if (!res.ok && removed) {
+        // Restore row if API failed
+        setRows((prev) => [removed, ...prev]);
       }
+    } catch {
+      if (removed) setRows((prev) => [removed, ...prev]);
     } finally {
       setDeleting(null);
     }
