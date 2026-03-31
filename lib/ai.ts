@@ -259,7 +259,57 @@ function mergeVisionReports(parts: VisionParsedReport[]): VisionParsedReport {
   return merged;
 }
 
-// ─── Single-batch vision API call ────────────────────────────────────────────
+// ─── Native PDF extraction via Claude document API (works on Vercel, no canvas) ─
+
+async function extractReportVisionNative(
+  pdfBuffer: Buffer,
+  apiKey?: string | null
+): Promise<VisionParsedReport> {
+  const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentBlocks: any[] = [
+    {
+      type: "document",
+      source: {
+        type: "base64",
+        media_type: "application/pdf",
+        data: pdfBuffer.toString("base64"),
+      },
+    },
+    { type: "text", text: VISION_PARSING_INSTRUCTION },
+  ];
+
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 8192,
+    messages: [{ role: "user", content: contentBlocks }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from native PDF call");
+  return parseVisionJson(content.text);
+}
+
+// ─── pdfjs text extraction fallback (last resort, no canvas needed) ───────────
+
+async function extractPdfTextFallback(buffer: Buffer): Promise<string> {
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs" as string);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc();
+  const data = new Uint8Array(buffer);
+  const pdf = await pdfjsLib.getDocument({ data, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const text = content.items.map((item: any) => item.str ?? "").join(" ");
+    pages.push(text);
+  }
+  return pages.join("\n").trim();
+}
+
+// ─── Single-batch vision API call (canvas-based, local dev only) ──────────────
 
 async function callClaudeVisionBatch(pageImages: Buffer[], client: Anthropic): Promise<VisionParsedReport> {
   const imageBlocks = pageImages.map((img) => ({
@@ -330,22 +380,34 @@ export async function extractReportDataFromPdf(
   pdfBuffer: Buffer,
   apiKey?: string | null
 ): Promise<ExtractedReportData> {
+  // Primary: Claude native PDF document API — no canvas, works on Vercel
   try {
-    const vision = await extractReportVision(pdfBuffer, apiKey);
+    const vision = await extractReportVisionNative(pdfBuffer, apiKey);
     return visionToExtractedData(vision);
   } catch (err) {
-    console.error("Vision extraction failed:", err);
-    return {
-      summary: "Could not extract report data.",
-      tasks: [],
-      notes: null,
-      blockers: null,
-      totalHours: null,
-      riskSignals: [],
-      projectsMentioned: [],
-      pages: [],
-    };
+    console.error("Native PDF extraction failed, trying text fallback:", err);
   }
+
+  // Fallback: pdfjs text extraction + text-based Claude call
+  try {
+    const text = await extractPdfTextFallback(pdfBuffer);
+    if (text && text.length >= 10) {
+      return await extractReportData(text, apiKey);
+    }
+  } catch (err) {
+    console.error("Text fallback extraction failed:", err);
+  }
+
+  return {
+    summary: "Could not extract report data.",
+    tasks: [],
+    notes: null,
+    blockers: null,
+    totalHours: null,
+    riskSignals: [],
+    projectsMentioned: [],
+    pages: [],
+  };
 }
 
 // ─── Legacy text-based extraction (non-PDF files) ─────────────────────────────
