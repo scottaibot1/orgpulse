@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
+  // Extend window by one extra day to catch evening US submissions stored as next UTC day
+  const dayAfterTomorrow = new Date(tomorrow);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -150,7 +153,7 @@ export async function POST(request: NextRequest) {
       const todayReports = await prisma.parsedReport.findMany({
         where: {
           userId: { in: allUserIds },
-          date: { gte: today, lt: tomorrow },
+          date: { gte: today, lt: dayAfterTomorrow },
         },
         select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
       });

@@ -49,6 +49,9 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
+  // Extend by one extra day to catch evening US submissions stored as next UTC day
+  const dayAfterTomorrow = new Date(tomorrow);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
 
   // Get active users
   const userWhere: Record<string, unknown> = { orgId, isReportingActive: true };
@@ -84,7 +87,7 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
 
   const [todayReports, narratives, recentAlerts] = await Promise.all([
     prisma.parsedReport.findMany({
-      where: { userId: { in: userIds }, date: { gte: today, lt: tomorrow } },
+      where: { userId: { in: userIds }, date: { gte: today, lt: dayAfterTomorrow } },
       select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
     }),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
