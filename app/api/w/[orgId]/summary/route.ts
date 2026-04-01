@@ -114,7 +114,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     matchingReportIds.length > 0
       ? prisma.parsedReport.findMany({
           where: { reportId: { in: matchingReportIds } },
-          select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
+          select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
         })
       : Promise.resolve([]),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
@@ -138,7 +138,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         where: { userId: { in: missingIds }, date: { lt: targetDateStart, gte: thirtyDaysAgo } },
         orderBy: { date: "desc" },
         distinct: ["userId"],
-        select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
+        select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
       })
     : [];
 
@@ -221,6 +221,23 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     };
   });
 
+  // Build reportLinks map: personName → parsedReportId + date + isStandIn
+  // Used by the email renderer to add "View Report" links next to each person's name.
+  const reportLinks: Record<string, { parsedReportId: string; date: string; isStandIn: boolean }> = {};
+  for (const u of activeUsers) {
+    const todayReport = todayByUser.get(u.id);
+    const standIn = standInByUser.get(u.id);
+    const activeReport = todayReport ?? standIn;
+    const isStandIn = !todayReport && !!standIn;
+    if (activeReport) {
+      reportLinks[u.name] = {
+        parsedReportId: activeReport.id,
+        date: new Date(activeReport.date).toISOString().split("T")[0],
+        isStandIn,
+      };
+    }
+  }
+
   const summaryText = await generateExecutiveSummaryV2({
     apiKey,
     orgName: org.name,
@@ -277,6 +294,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         orgName: org.name,
         summaryDate: targetDateStart,
         summaryId: saved.id,
+        reportLinks,
         orgId,
         totalSubmissions: saved.totalSubmissions,
         missingSubmissions: saved.missingSubmissions,

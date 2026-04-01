@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
-  const publicPaths = ["/login", "/signup", "/submit", "/setup"];
+  const publicPaths = ["/login", "/signup", "/submit", "/setup", "/report"];
   const isPublic =
     pathname === "/" ||
     publicPaths.some((p) => pathname.startsWith(p)) ||
