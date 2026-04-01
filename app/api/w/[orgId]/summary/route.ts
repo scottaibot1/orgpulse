@@ -4,7 +4,7 @@ import { getWorkspaceUser } from "@/lib/auth";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 interface Params { params: Promise<{ orgId: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
