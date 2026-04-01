@@ -225,7 +225,12 @@ export default function DashboardReportsWidget({ reports: initialReports, orgId,
                         const initials = row.userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
                         const isPdf = row.source === "pdf_upload";
                         const dt = new Date(row.submittedAt);
+                        const submittedDateStr = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
                         const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        // Show upload date if it differs from the bucket day (timezone cross-day case)
+                        const submittedDay = dt.toISOString().split("T")[0];
+                        const dateLabel = submittedDay !== day.date ? `${submittedDateStr} ` : "";
+                        const timestampStr = `${dateLabel}${timeStr}`;
 
                         return (
                           <div key={row.id} className="flex items-center gap-2 px-10 py-1.5 hover:bg-slate-50 transition-colors group">
@@ -238,7 +243,7 @@ export default function DashboardReportsWidget({ reports: initialReports, orgId,
                             </div>
                             <span className="text-[11px] font-medium text-slate-700 flex-1 truncate">{row.userName}</span>
                             <span className="text-[10px] text-slate-400 hidden sm:block">{row.departmentName}</span>
-                            <span className="text-[10px] text-slate-400 tabular-nums">{timeStr}</span>
+                            <span className="text-[10px] text-slate-400 tabular-nums">{timestampStr}</span>
                             {/* View link */}
                             {isPdf && row.rawPdfUrl ? (
                               <a href={row.rawPdfUrl} target="_blank" rel="noopener noreferrer"
