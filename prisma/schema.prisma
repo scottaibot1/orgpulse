@@ -47,8 +47,9 @@ model WorkspaceSettings {
   reportDetailLevel     Int      @default(3) @map("report_detail_level")
   autoReportDetailLevel Int      @default(3) @map("auto_report_detail_level")
   departmentOrdering    String   @default("manual") @map("department_ordering")
-  biweeklyStartDate     DateTime? @map("biweekly_start_date")
-  createdAt             DateTime @default(now()) @map("created_at")
+  biweeklyStartDate       DateTime? @map("biweekly_start_date")
+  lastReportGeneratedAt   DateTime? @map("last_report_generated_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -203,6 +204,7 @@ model Report {
   id          String       @id @default(cuid())
   userId      String       @map("user_id")
   submittedAt DateTime     @default(now()) @map("submitted_at")
+  reportDate  DateTime?    @map("report_date")
   source      ReportSource
   rawText     String?      @map("raw_text")
   rawPdfUrl   String?      @map("raw_pdf_url")
@@ -393,8 +395,8 @@ model EmailDraft {
   organization         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdBy            User           @relation("EmailDraftCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
   recipient            User           @relation("EmailDraftRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
-  relatedTask          Task?          @relation(fields: [relatedTaskId], references: [id])
-  relatedCanonicalTask CanonicalTask? @relation(fields: [relatedCanonicalTaskId], references: [id])
+  relatedTask          Task?          @relation(fields: [relatedTaskId], references: [id], onDelete: SetNull)
+  relatedCanonicalTask CanonicalTask? @relation(fields: [relatedCanonicalTaskId], references: [id], onDelete: SetNull)
 
   @@map("email_drafts")
 }
