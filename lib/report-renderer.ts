@@ -126,7 +126,7 @@ function personInitial(name: string) {
 
 // Group highlights by type, inject a category label row before each new group
 function groupedHighlightsPdf(highlights: HighlightItem[]): string {
-  if (!highlights.length) return "";
+  if (!highlights || !highlights.length) return "";
   const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
   const showLabels = distinctTypes.length > 1;
   let out = "";
@@ -146,7 +146,7 @@ function groupedHighlightsPdf(highlights: HighlightItem[]): string {
 }
 
 function groupedHighlightsEmail(highlights: HighlightItem[]): string {
-  if (!highlights.length) return "";
+  if (!highlights || !highlights.length) return "";
   const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
   const showLabels = distinctTypes.length > 1;
   let out = "";
@@ -178,7 +178,7 @@ function pdfStatusBadge(p: PersonData): string {
 }
 
 function pdfTimeBars(alloc: TimeAllocationItem[]): string {
-  if (!alloc.length) return "";
+  if (!alloc || !alloc.length) return "";
   const rows = alloc
     .map(
       (t, i) => `
@@ -210,8 +210,8 @@ function pdfPersonCard(p: PersonData): string {
         ${pdfStatusBadge(p)}
       </div>
       <div style="padding:10px 13px;">
-        ${groupedHighlightsPdf(p.highlights)}
-        ${pdfTimeBars(p.timeAllocation)}
+        ${groupedHighlightsPdf(p.highlights ?? [])}
+        ${pdfTimeBars(p.timeAllocation ?? [])}
       </div>
     </div>`;
 }
@@ -229,7 +229,7 @@ function pdfDeptSection(dept: DepartmentData): string {
         <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:${statusBg};color:${statusColor};text-transform:uppercase;letter-spacing:0.04em;">${dept.statusLabel}</span>
       </div>
       <div style="padding:12px 13px;">
-        ${dept.people.map(pdfPersonCard).join("")}
+        ${(dept.people ?? []).map(pdfPersonCard).join("")}
       </div>
     </div>`;
 }
@@ -438,7 +438,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
       </tr>
       <tr><td style="padding:8px 12px;">
         <table cellpadding="0" cellspacing="0" width="100%">
-          ${groupedHighlightsEmail(p.highlights)}
+          ${groupedHighlightsEmail(p.highlights ?? [])}
         </table>
       </td></tr>
     </table>`;
@@ -461,7 +461,7 @@ function makeEmailDeptSection(ctx: RenderContext) {
         </td>
       </tr>
       <tr><td style="padding:10px 12px;">
-        ${dept.people.map(emailPersonRow).join("")}
+        ${(dept.people ?? []).map(emailPersonRow).join("")}
       </td></tr>
     </table>`;
   };
