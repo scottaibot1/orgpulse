@@ -37,10 +37,18 @@ export async function sendSummaryEmail({
 
   // Try new structured JSON format first; fall back to legacy markdown for old records
   const parsed = parseAiSummary(markdown);
-  let html: string;
+  console.log(`[Email] parseAiSummary result: ${parsed ? "structured JSON ok" : "null — will use legacy markdown"}`);
+  let html = "";
+  let useLegacy = !parsed;
   if (parsed) {
-    html = renderEmailHtml(parsed, ctx);
-  } else {
+    try {
+      html = renderEmailHtml(parsed, ctx);
+    } catch (renderErr) {
+      console.error("[Email] renderEmailHtml threw — falling back to markdown:", renderErr);
+      useLegacy = true;
+    }
+  }
+  if (useLegacy) {
     // Legacy markdown fallback
     const total = totalSubmissions + missingSubmissions;
     const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
