@@ -20,8 +20,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json(summary ?? null);
 }
 
-export async function POST(_req: NextRequest, { params }: Params) {
-  try { return await handleSummaryPost(await params); }
+export async function POST(req: NextRequest, { params }: Params) {
+  try { return await handleSummaryPost(req, await params); }
   catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("Summary POST error:", msg);
@@ -29,29 +29,40 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
 }
 
-async function handleSummaryPost({ orgId }: { orgId: string }) {
+async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string }) {
   const user = await getWorkspaceUser(orgId);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.role === "member") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true } } },
+    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true, lastReportGeneratedAt: true } } },
   });
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Read targetDate from request body (optional — defaults to today)
+  let targetDate: string = new Date().toISOString().split("T")[0];
+  try {
+    const body = await req.json();
+    if (body?.targetDate && typeof body.targetDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.targetDate)) {
+      targetDate = body.targetDate;
+    }
+  } catch { /* use default */ }
 
   const apiKey = org.workspaceSettings?.anthropicApiKey ?? null;
   const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
   const reportDetailLevel = org.workspaceSettings?.reportDetailLevel ?? 3;
   const departmentOrdering = org.workspaceSettings?.departmentOrdering ?? "manual";
 
+  // reportingWindowStart = selected day (only reports from that day qualify for Notable Progress)
+  const reportingWindowStart = targetDate;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  // Extend by one extra day to catch evening US submissions stored as next UTC day
-  const dayAfterTomorrow = new Date(tomorrow);
-  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+  // Build date range for targetDate (UTC midnight to end of day)
+  const targetDateStart = new Date(targetDate + "T00:00:00.000Z");
+  const targetDateEnd = new Date(targetDate + "T23:59:59.999Z");
 
   // Get active users
   const userWhere: Record<string, unknown> = { orgId, isReportingActive: true };
@@ -85,11 +96,19 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
       })
     : [];
 
+  // Find reports for the target day by matching Report.reportDate, then fetching their ParsedReports
+  const matchingReportIds = await prisma.report.findMany({
+    where: { userId: { in: userIds }, reportDate: { gte: targetDateStart, lte: targetDateEnd } },
+    select: { id: true },
+  }).then((rows) => rows.map((r) => r.id));
+
   const [todayReports, narratives, recentAlerts] = await Promise.all([
-    prisma.parsedReport.findMany({
-      where: { userId: { in: userIds }, date: { gte: today, lt: dayAfterTomorrow } },
-      select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
-    }),
+    matchingReportIds.length > 0
+      ? prisma.parsedReport.findMany({
+          where: { reportId: { in: matchingReportIds } },
+          select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
+        })
+      : Promise.resolve([]),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
     prisma.alert.findMany({
       where: { orgId, isRead: false },
@@ -103,12 +122,12 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
   const narrativeByUser = new Map(narratives.map((n) => [n.userId, n]));
   const missingIds = userIds.filter((id) => !todayByUser.has(id));
 
-  const thirtyDaysAgo = new Date(today);
+  const thirtyDaysAgo = new Date(targetDateStart);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   const standInReports = missingIds.length > 0
     ? await prisma.parsedReport.findMany({
-        where: { userId: { in: missingIds }, date: { lt: today, gte: thirtyDaysAgo } },
+        where: { userId: { in: missingIds }, date: { lt: targetDateStart, gte: thirtyDaysAgo } },
         orderBy: { date: "desc" },
         distinct: ["userId"],
         select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
@@ -197,25 +216,32 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
   const summaryText = await generateExecutiveSummaryV2({
     apiKey,
     orgName: org.name,
-    summaryDate: today.toISOString().split("T")[0],
+    summaryDate: targetDate,
     completenessScore,
     people,
     alerts: recentAlerts.map((a) => a.message),
     reportDetailLevel,
     departmentOrdering,
     departmentOrder: deptOrder.map((d) => d.name),
+    reportingWindowStart,
   });
 
   // Always create a new record so regeneration produces a distinct timestamped entry
   const saved = await prisma.dailySummary.create({
     data: {
       orgId,
-      summaryDate: today,
+      summaryDate: targetDateStart,
       aiFullSummary: summaryText,
       totalSubmissions: freshCount,
       missingSubmissions: activeUsers.length - freshCount,
       alertCount: recentAlerts.length,
     },
+  });
+
+  // Update lastReportGeneratedAt so the next generation knows its window start
+  await prisma.workspaceSettings.updateMany({
+    where: { orgId },
+    data: { lastReportGeneratedAt: new Date() },
   });
 
   // Prune to keep only the 30 most recently generated summaries for this org
@@ -241,7 +267,7 @@ async function handleSummaryPost({ orgId }: { orgId: string }) {
       await sendSummaryEmail({
         toEmail: org.ownerEmail,
         orgName: org.name,
-        summaryDate: today,
+        summaryDate: targetDateStart,
         summaryId: saved.id,
         orgId,
         totalSubmissions: saved.totalSubmissions,
