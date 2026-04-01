@@ -96,9 +96,17 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
       })
     : [];
 
-  // Find reports for the target day by matching Report.reportDate, then fetching their ParsedReports
+  // Find reports for the target day.
+  // Primary: explicit reportDate set (new behavior + manually fixed reports).
+  // Fallback: reportDate is null — use submittedAt (covers reports uploaded before feature was deployed).
   const matchingReportIds = await prisma.report.findMany({
-    where: { userId: { in: userIds }, reportDate: { gte: targetDateStart, lte: targetDateEnd } },
+    where: {
+      userId: { in: userIds },
+      OR: [
+        { reportDate: { gte: targetDateStart, lte: targetDateEnd } },
+        { reportDate: null, submittedAt: { gte: targetDateStart, lte: targetDateEnd } },
+      ],
+    },
     select: { id: true },
   }).then((rows) => rows.map((r) => r.id));
 

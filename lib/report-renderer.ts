@@ -1,6 +1,4 @@
 // Shared renderer for executive summary JSON → premium PDF HTML and email HTML.
-// The AI prompt now outputs structured JSON. This module parses it and renders
-// two formats (PDF/print and HTML email) from the same data.
 
 export interface HighlightItem {
   type: "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker";
@@ -35,17 +33,24 @@ export interface DepartmentData {
 
 export interface AttentionItem {
   emoji: string;
+  department?: string;
   description: string;
   who: string;
   action: string;
+}
+
+export interface NotableProgressGroup {
+  department: string;
+  items: string[];
 }
 
 export interface AiSummaryData {
   todaysPulse: string;
   organizationPulse: string;
   attentionItems?: AttentionItem[];
-  criticalAlerts: { type: "blocker" | "atrisk"; text: string }[];
-  notableProgress: string[];
+  criticalAlerts: { type: "blocker" | "atrisk"; department?: string; text: string }[];
+  // notableProgress can be the new grouped format or legacy flat string[]
+  notableProgress: NotableProgressGroup[] | string[];
   completenessScore: {
     totalExpected: number;
     freshToday: number;
@@ -80,6 +85,16 @@ export function parseAiSummary(text: string): AiSummaryData | null {
   }
 }
 
+// Normalize notableProgress to grouped format regardless of what the AI returned
+function normalizeProgress(raw: NotableProgressGroup[] | string[]): NotableProgressGroup[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (typeof raw[0] === "string") {
+    // Legacy flat format — put everything under a single group
+    return [{ department: "", items: raw as string[] }];
+  }
+  return raw as NotableProgressGroup[];
+}
+
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
 const BAR_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#3b82f6", "#ec4899", "#14b8a6"];
@@ -89,19 +104,65 @@ interface HighlightStyle {
   color: string;
   bg: string;
   border: string;
+  categoryLabel: string;
 }
 
 const HIGHLIGHT_MAP: Record<string, HighlightStyle> = {
-  standout: { icon: "⭐", color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd" },
-  completed: { icon: "✅", color: "#047857", bg: "#ecfdf5", border: "#6ee7b7" },
-  ontack:   { icon: "▶", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" },
-  atrisk:   { icon: "⚠️", color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
-  blocker:  { icon: "🚫", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
-  critical: { icon: "🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
+  standout: { icon: "⭐", color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd", categoryLabel: "Notable Wins" },
+  completed: { icon: "✅", color: "#047857", bg: "#ecfdf5", border: "#6ee7b7", categoryLabel: "Completed" },
+  ontack:    { icon: "▶",  color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd", categoryLabel: "In Progress" },
+  atrisk:    { icon: "⚠️", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", categoryLabel: "At Risk" },
+  blocker:   { icon: "🚫", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Blocked" },
+  critical:  { icon: "🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Critical" },
 };
 
 function personInitial(name: string) {
   return name.trim().charAt(0).toUpperCase();
+}
+
+// ─── Category-grouped highlights ─────────────────────────────────────────────
+
+// Group highlights by type, inject a category label row before each new group
+function groupedHighlightsPdf(highlights: HighlightItem[]): string {
+  if (!highlights.length) return "";
+  const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
+  const showLabels = distinctTypes.length > 1;
+  let out = "";
+  let lastType = "";
+  for (const h of highlights) {
+    const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
+    if (showLabels && h.type !== lastType) {
+      out += `<div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:8px 0 4px;">${s.categoryLabel.toUpperCase()}</div>`;
+      lastType = h.type;
+    }
+    out += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 4px 4px 0;">
+      <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${s.icon}</span>
+      <span style="font-size:12px;color:${s.color};line-height:1.5;">${h.text}</span>
+    </div>`;
+  }
+  return out;
+}
+
+function groupedHighlightsEmail(highlights: HighlightItem[]): string {
+  if (!highlights.length) return "";
+  const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
+  const showLabels = distinctTypes.length > 1;
+  let out = "";
+  let lastType = "";
+  for (const h of highlights) {
+    const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
+    if (showLabels && h.type !== lastType) {
+      out += `<tr><td style="padding:7px 0 3px;font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;">${s.categoryLabel.toUpperCase()}</td></tr>`;
+      lastType = h.type;
+    }
+    out += `<tr><td style="padding:3px 0;">
+      <table cellpadding="0" cellspacing="0" width="100%"><tr>
+        <td style="width:24px;vertical-align:top;padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${s.icon}</td>
+        <td style="padding:5px 9px 5px 6px;background:${s.bg};font-size:12px;color:${s.color};line-height:1.5;">${h.text}</td>
+      </tr></table>
+    </td></tr>`;
+  }
+  return out;
 }
 
 // ─── PDF renderer ────────────────────────────────────────────────────────────
@@ -133,18 +194,6 @@ function pdfTimeBars(alloc: TimeAllocationItem[]): string {
   return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">${rows}</div>`;
 }
 
-function pdfHighlights(highlights: HighlightItem[]): string {
-  return highlights
-    .map((h) => {
-      const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
-      return `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 4px 4px 0;">
-        <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${s.icon}</span>
-        <span style="font-size:12px;color:${s.color};line-height:1.5;">${h.text}</span>
-      </div>`;
-    })
-    .join("");
-}
-
 function pdfPersonCard(p: PersonData): string {
   return `
     <div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden;">
@@ -159,7 +208,7 @@ function pdfPersonCard(p: PersonData): string {
         ${pdfStatusBadge(p)}
       </div>
       <div style="padding:10px 13px;">
-        ${pdfHighlights(p.highlights)}
+        ${groupedHighlightsPdf(p.highlights)}
         ${pdfTimeBars(p.timeAllocation)}
       </div>
     </div>`;
@@ -186,6 +235,7 @@ function pdfDeptSection(dept: DepartmentData): string {
 export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const { orgName, summaryDate, createdAt } = ctx;
   const cs = data.completenessScore;
+  const progressGroups = normalizeProgress(data.notableProgress);
 
   const formattedDate = summaryDate.toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -205,10 +255,17 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
     ? `<div style="font-size:11px;color:#991b1b;margin-top:4px;">⚠ No data: ${cs.missing.map((m) => m.name).join(", ")}</div>`
     : "";
 
-  const attentionSection = data.attentionItems && data.attentionItems.length > 0 ? `
-    <div style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 40px;">
-      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">🔥 What Needs Attention Today 🚨</div>
-      ${data.attentionItems.map((item) => `
+  // Attention items — grouped by department
+  const attentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
+    const byDept = new Map<string, AttentionItem[]>();
+    for (const item of data.attentionItems) {
+      const dept = item.department || "General";
+      if (!byDept.has(dept)) byDept.set(dept, []);
+      byDept.get(dept)!.push(item);
+    }
+    const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
+      ${dept ? `<div style="font-size:10px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;margin-top:10px;padding-bottom:3px;border-bottom:1px solid #fed7aa;">${dept}</div>` : ""}
+      ${items.map((item) => `
         <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid #f97316;">
           <span style="font-size:16px;flex-shrink:0;line-height:1.3;">${item.emoji}</span>
           <div style="flex:1;min-width:0;">
@@ -217,23 +274,46 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
             <span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>
           </div>
         </div>`).join("")}
-    </div>` : "";
+    `).join("");
+    return `<div style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 40px;">
+      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">🔥 What Needs Attention Today 🚨</div>
+      ${deptBlocks}
+    </div>`;
+  })() : "";
 
-  const alertsSection = data.criticalAlerts.length > 0 ? `
-    <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
-      <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🚨 Critical Alerts</div>
-      ${data.criticalAlerts.map((a) => `
+  // Critical alerts — grouped by department
+  const alertsSection = data.criticalAlerts.length > 0 ? (() => {
+    const byDept = new Map<string, typeof data.criticalAlerts>();
+    for (const a of data.criticalAlerts) {
+      const dept = a.department || "General";
+      if (!byDept.has(dept)) byDept.set(dept, []);
+      byDept.get(dept)!.push(a);
+    }
+    const deptBlocks = Array.from(byDept.entries()).map(([dept, alerts]) => `
+      ${dept !== "General" ? `<div style="font-size:10px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #fca5a5;">${dept}</div>` : ""}
+      ${alerts.map((a) => `
         <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:7px 11px;background:#fff;border-radius:6px;border-left:3px solid ${a.type === "blocker" ? "#dc2626" : "#f59e0b"};">
           <span style="font-size:12px;">${a.type === "blocker" ? "🚫" : "⚠️"}</span>
           <span style="font-size:12px;color:#7f1d1d;line-height:1.5;">${a.text}</span>
         </div>`).join("")}
-    </div>` : "";
+    `).join("");
+    return `<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🚨 Critical Alerts</div>
+      ${deptBlocks}
+    </div>`;
+  })() : "";
 
-  const progressSection = data.notableProgress.length > 0 ? `
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
+  // Notable progress — grouped by department
+  const progressSection = progressGroups.length > 0 ? (() => {
+    const deptBlocks = progressGroups.map((g) => `
+      ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
+      ${g.items.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+    `).join("");
+    return `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
       <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🏆 Notable Progress</div>
-      ${data.notableProgress.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
-    </div>` : "";
+      ${deptBlocks}
+    </div>`;
+  })() : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -267,9 +347,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
         <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:3px;">Generated ${formattedGenerated}</div>
       </div>
     </div>
-    <div style="border-left:3px solid #818cf8;padding-left:15px;">
-      <div style="font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px;">Today's Pulse</div>
-      <div style="font-size:16px;font-weight:600;color:#e2e8f0;line-height:1.55;">${data.todaysPulse}</div>
+    <div style="background:rgba(255,255,255,0.08);border-left:4px solid #818cf8;border-radius:0 10px 10px 0;padding:16px 20px;">
+      <div style="font-size:10px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">⚡ Today's Pulse</div>
+      <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;letter-spacing:-0.3px;">${data.todaysPulse}</div>
     </div>
   </div>
 
@@ -286,7 +366,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
   </div>
 
   <div style="padding:26px 40px;">
-
     <div style="font-size:13px;line-height:1.8;color:#334155;margin-bottom:22px;padding:15px 18px;background:#f8fafc;border-radius:8px;border-left:4px solid #6366f1;">
       ${data.organizationPulse}
     </div>
@@ -295,7 +374,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
     ${progressSection}
 
     ${data.departments.map(pdfDeptSection).join("")}
-
   </div>
 
   <div style="padding:14px 40px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;">
@@ -319,20 +397,6 @@ function emailStatusBadge(p: PersonData): string {
   return `<span style="display:inline-block;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">Missing</span>`;
 }
 
-function emailHighlights(highlights: HighlightItem[]): string {
-  return highlights
-    .map((h) => {
-      const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
-      return `<tr><td style="padding:4px 0;">
-        <table cellpadding="0" cellspacing="0" width="100%"><tr>
-          <td style="width:24px;vertical-align:top;padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 0 0 0;font-size:12px;">${s.icon}</td>
-          <td style="padding:5px 9px 5px 6px;background:${s.bg};font-size:12px;color:${s.color};line-height:1.5;">${h.text}</td>
-        </tr></table>
-      </td></tr>`;
-    })
-    .join("");
-}
-
 function emailPersonRow(p: PersonData): string {
   return `
     <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
@@ -354,7 +418,7 @@ function emailPersonRow(p: PersonData): string {
       </tr>
       <tr><td style="padding:8px 12px;">
         <table cellpadding="0" cellspacing="0" width="100%">
-          ${emailHighlights(p.highlights)}
+          ${groupedHighlightsEmail(p.highlights)}
         </table>
       </td></tr>
     </table>`;
@@ -382,6 +446,7 @@ function emailDeptSection(dept: DepartmentData): string {
 export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string {
   const { orgName, summaryDate, totalSubmissions, missingSubmissions, pdfUrl } = ctx;
   const cs = data.completenessScore;
+  const progressGroups = normalizeProgress(data.notableProgress);
 
   const total = totalSubmissions + missingSubmissions;
   const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
@@ -396,39 +461,73 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const pctColor = pct === 100 ? "#047857" : pct >= 70 ? "#b45309" : "#dc2626";
   const pctBg = pct === 100 ? "#ecfdf5" : pct >= 70 ? "#fffbeb" : "#fef2f2";
 
-  const emailAttentionSection = data.attentionItems && data.attentionItems.length > 0 ? `
-    <tr><td style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 24px;">
-      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 What Needs Attention Today 🚨</div>
-      ${data.attentionItems.map((item) => `
-        <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:6px;"><tr>
-          <td style="width:26px;padding:8px 4px 8px 10px;background:#fff;border-left:4px solid #f97316;vertical-align:top;font-size:14px;">${item.emoji}</td>
-          <td style="padding:8px 12px;background:#fff;vertical-align:top;">
-            <span style="font-size:12px;font-weight:700;color:#7c2d12;">${item.description}</span>
-            <span style="font-size:12px;color:#92400e;"> (${item.who})</span>
-            <span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>
-          </td>
-        </tr></table>`).join("")}
-    </td></tr>` : "";
-
-  const alertsSection = data.criticalAlerts.length > 0 ? `
-    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:14px 16px;">
-        <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🚨 Critical Alerts</div>
-        ${data.criticalAlerts.map((a) => `
+  // Attention items — grouped by department
+  const emailAttentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
+    const byDept = new Map<string, AttentionItem[]>();
+    for (const item of data.attentionItems) {
+      const dept = item.department || "General";
+      if (!byDept.has(dept)) byDept.set(dept, []);
+      byDept.get(dept)!.push(item);
+    }
+    const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
+      ${dept !== "General" ? `<tr><td style="padding:8px 0 4px;font-size:9px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #fed7aa;">${dept}</td></tr>` : ""}
+      ${items.map((item) => `
+        <tr><td style="padding:4px 0;">
           <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:4px;"><tr>
+            <td style="width:26px;padding:8px 4px 8px 10px;background:#fff;border-left:4px solid #f97316;vertical-align:top;font-size:14px;">${item.emoji}</td>
+            <td style="padding:8px 12px;background:#fff;vertical-align:top;">
+              <span style="font-size:12px;font-weight:700;color:#7c2d12;">${item.description}</span>
+              <span style="font-size:12px;color:#92400e;"> (${item.who})</span>
+              <span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>
+            </td>
+          </tr></table>
+        </td></tr>`).join("")}
+    `).join("");
+    return `<tr><td style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 24px;">
+      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 What Needs Attention Today 🚨</div>
+      <table cellpadding="0" cellspacing="0" width="100%">${deptBlocks}</table>
+    </td></tr>`;
+  })() : "";
+
+  // Critical alerts — grouped by department
+  const alertsSection = data.criticalAlerts.length > 0 ? (() => {
+    const byDept = new Map<string, typeof data.criticalAlerts>();
+    for (const a of data.criticalAlerts) {
+      const dept = a.department || "General";
+      if (!byDept.has(dept)) byDept.set(dept, []);
+      byDept.get(dept)!.push(a);
+    }
+    const deptBlocks = Array.from(byDept.entries()).map(([dept, alerts]) => `
+      ${dept !== "General" ? `<tr><td style="padding:6px 0 3px;font-size:9px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">${dept}</td></tr>` : ""}
+      ${alerts.map((a) => `
+        <tr><td style="padding:2px 0;">
+          <table cellpadding="0" cellspacing="0" width="100%"><tr>
             <td style="width:20px;padding:6px 6px 6px 10px;background:#fff;border-left:3px solid ${a.type === "blocker" ? "#dc2626" : "#f59e0b"};font-size:12px;vertical-align:top;">${a.type === "blocker" ? "🚫" : "⚠️"}</td>
             <td style="padding:6px 10px;background:#fff;font-size:12px;color:#7f1d1d;line-height:1.5;">${a.text}</td>
-          </tr></table>`).join("")}
+          </tr></table>
+        </td></tr>`).join("")}
+    `).join("");
+    return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🚨 Critical Alerts</div>
+        <table cellpadding="0" cellspacing="0" width="100%">${deptBlocks}</table>
       </td></tr>
-    </table>` : "";
+    </table>`;
+  })() : "";
 
-  const progressSection = data.notableProgress.length > 0 ? `
-    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;overflow:hidden;">
+  // Notable progress — grouped by department
+  const progressSection = progressGroups.length > 0 ? (() => {
+    const deptBlocks = progressGroups.map((g) => `
+      ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
+      ${g.items.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+    `).join("");
+    return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;overflow:hidden;">
       <tr><td style="padding:14px 16px;">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🏆 Notable Progress</div>
-        ${data.notableProgress.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+        ${deptBlocks}
       </td></tr>
-    </table>` : "";
+    </table>`;
+  })() : "";
 
   const pdfCta = pdfUrl ? `
     <table cellpadding="0" cellspacing="0" width="100%"><tr><td style="text-align:center;padding:20px 0 8px;">
@@ -459,9 +558,9 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
       </td>
     </tr></table>
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
-      <td style="border-left:3px solid #818cf8;padding-left:13px;">
-        <div style="font-size:10px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Today's Pulse</div>
-        <div style="font-size:14px;font-weight:600;color:#e2e8f0;line-height:1.55;">${data.todaysPulse}</div>
+      <td style="background:rgba(255,255,255,0.08);border-left:4px solid #818cf8;border-radius:0 10px 10px 0;padding:16px 20px;">
+        <div style="font-size:10px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">⚡ Today's Pulse</div>
+        <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;letter-spacing:-0.3px;">${data.todaysPulse}</div>
       </td>
     </tr></table>
   </td></tr>
