@@ -236,7 +236,7 @@ function pdfDeptSection(dept: DepartmentData): string {
 
 export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const { orgName, summaryDate, createdAt } = ctx;
-  const cs = data.completenessScore;
+  const cs = data.completenessScore ?? { totalExpected: 0, freshToday: 0, percentage: 0, standIns: [], missing: [], notScheduledToday: [] };
   const progressGroups = normalizeProgress(data.notableProgress);
 
   const formattedDate = summaryDate.toLocaleDateString("en-US", {
@@ -246,15 +246,17 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   });
 
-  const pct = cs.percentage;
+  const pct = cs.percentage ?? 0;
   const pctColor = pct === 100 ? "#047857" : pct >= 70 ? "#b45309" : "#dc2626";
   const pctBg = pct === 100 ? "#ecfdf5" : pct >= 70 ? "#fffbeb" : "#fef2f2";
 
-  const standInsDetail = cs.standIns.length > 0
-    ? `<div style="font-size:11px;color:#92400e;margin-top:4px;">⏳ Stand-ins: ${cs.standIns.map((s) => `${s.name} (${s.daysSince}d ago)`).join(", ")}</div>`
+  const standIns = cs.standIns ?? [];
+  const missing = cs.missing ?? [];
+  const standInsDetail = standIns.length > 0
+    ? `<div style="font-size:11px;color:#92400e;margin-top:4px;">⏳ Stand-ins: ${standIns.map((s) => `${s.name} (${s.daysSince}d ago)`).join(", ")}</div>`
     : "";
-  const missingDetail = cs.missing.length > 0
-    ? `<div style="font-size:11px;color:#991b1b;margin-top:4px;">⚠ No data: ${cs.missing.map((m) => m.name).join(", ")}</div>`
+  const missingDetail = missing.length > 0
+    ? `<div style="font-size:11px;color:#991b1b;margin-top:4px;">⚠ No data: ${missing.map((m) => m.name).join(", ")}</div>`
     : "";
 
   // Attention items — grouped by department
@@ -283,10 +285,11 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
     </div>`;
   })() : "";
 
-  // Critical alerts — grouped by department
-  const alertsSection = data.criticalAlerts.length > 0 ? (() => {
-    const byDept = new Map<string, typeof data.criticalAlerts>();
-    for (const a of data.criticalAlerts) {
+  // Critical alerts — grouped by department (PDF)
+  const criticalAlertsPdf = data.criticalAlerts ?? [];
+  const alertsSection = criticalAlertsPdf.length > 0 ? (() => {
+    const byDept = new Map<string, typeof criticalAlertsPdf>();
+    for (const a of criticalAlertsPdf) {
       const dept = a.department || "General";
       if (!byDept.has(dept)) byDept.set(dept, []);
       byDept.get(dept)!.push(a);
@@ -361,8 +364,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;">Completeness</span>
       <span style="background:${pctBg};color:${pctColor};border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">${cs.freshToday} of ${cs.totalExpected} reported · ${pct}%</span>
-      ${cs.standIns.length > 0 ? `<span style="background:#fefce8;color:#92400e;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⏳ ${cs.standIns.length} stand-in${cs.standIns.length > 1 ? "s" : ""}</span>` : ""}
-      ${cs.missing.length > 0 ? `<span style="background:#fef2f2;color:#991b1b;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⚠ ${cs.missing.length} missing</span>` : ""}
+      ${standIns.length > 0 ? `<span style="background:#fefce8;color:#92400e;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⏳ ${standIns.length} stand-in${standIns.length > 1 ? "s" : ""}</span>` : ""}
+      ${missing.length > 0 ? `<span style="background:#fef2f2;color:#991b1b;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⚠ ${missing.length} missing</span>` : ""}
     </div>
     ${standInsDetail}${missingDetail}
   </div>
@@ -375,7 +378,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
     ${alertsSection}
     ${progressSection}
 
-    ${data.departments.map(pdfDeptSection).join("")}
+    ${(data.departments ?? []).map(pdfDeptSection).join("")}
   </div>
 
   <div style="padding:14px 40px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;">
@@ -466,7 +469,7 @@ function makeEmailDeptSection(ctx: RenderContext) {
 
 export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string {
   const { orgName, summaryDate, totalSubmissions, missingSubmissions, pdfUrl } = ctx;
-  const cs = data.completenessScore;
+  const cs = data.completenessScore ?? { totalExpected: 0, freshToday: 0, percentage: 0, standIns: [], missing: [], notScheduledToday: [] };
   const progressGroups = normalizeProgress(data.notableProgress);
 
   const total = totalSubmissions + missingSubmissions;
@@ -478,7 +481,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
-  const pct = cs.percentage;
+  const pct = cs.percentage ?? 0;
   const pctColor = pct === 100 ? "#047857" : pct >= 70 ? "#b45309" : "#dc2626";
   const pctBg = pct === 100 ? "#ecfdf5" : pct >= 70 ? "#fffbeb" : "#fef2f2";
 
@@ -510,10 +513,11 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     </td></tr>`;
   })() : "";
 
-  // Critical alerts — grouped by department
-  const alertsSection = data.criticalAlerts.length > 0 ? (() => {
-    const byDept = new Map<string, typeof data.criticalAlerts>();
-    for (const a of data.criticalAlerts) {
+  // Critical alerts — grouped by department (email)
+  const criticalAlertsEmail = data.criticalAlerts ?? [];
+  const alertsSection = criticalAlertsEmail.length > 0 ? (() => {
+    const byDept = new Map<string, typeof criticalAlertsEmail>();
+    for (const a of criticalAlertsEmail) {
       const dept = a.department || "General";
       if (!byDept.has(dept)) byDept.set(dept, []);
       byDept.get(dept)!.push(a);
@@ -623,7 +627,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     ${alertsSection}
     ${progressSection}
 
-    ${data.departments.map(makeEmailDeptSection(ctx)).join("")}
+    ${(data.departments ?? []).map(makeEmailDeptSection(ctx)).join("")}
 
     ${pdfCta}
 
