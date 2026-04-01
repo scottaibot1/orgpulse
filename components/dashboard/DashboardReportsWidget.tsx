@@ -212,8 +212,8 @@ export default function DashboardReportsWidget({ reports: initialReports, orgId,
                         <span className={`text-[11px] flex-1 ${isToday ? "font-semibold" : "text-slate-500"}`} style={isToday ? { color: accentColor } : {}}>
                           {day.label}{isToday ? " · Today" : ""}
                         </span>
-                        <span className="text-[10px] text-slate-400">
-                          {day.reports.length > 0 ? day.reports.length : ""}
+                        <span className="text-[10px] text-slate-400 tabular-nums">
+                          {day.reports.length}
                         </span>
                       </button>
 
