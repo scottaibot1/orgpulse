@@ -69,6 +69,8 @@ export interface RenderContext {
   missingSubmissions: number;
   createdAt: Date;
   pdfUrl?: string;
+  appUrl?: string;
+  reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean }>;
 }
 
 export function parseAiSummary(text: string): AiSummaryData | null {
@@ -397,8 +399,18 @@ function emailStatusBadge(p: PersonData): string {
   return `<span style="display:inline-block;background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;">Missing</span>`;
 }
 
-function emailPersonRow(p: PersonData): string {
-  return `
+function makeEmailPersonRow(ctx: RenderContext) {
+  return function emailPersonRow(p: PersonData): string {
+    const reportLink = ctx.reportLinks?.[p.name];
+    const viewReportLink = reportLink && ctx.appUrl
+      ? (() => {
+          const label = reportLink.isStandIn
+            ? `View Report (stand-in, ${reportLink.date})`
+            : "View Report";
+          return `<a href="${ctx.appUrl}/report/${reportLink.parsedReportId}" style="font-size:10px;color:#6366f1;text-decoration:none;font-weight:600;white-space:nowrap;">${label} →</a>`;
+        })()
+      : "";
+    return `
     <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
       <tr style="background:#f8fafc;">
         <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;">
@@ -412,7 +424,12 @@ function emailPersonRow(p: PersonData): string {
                 </td>
               </tr></table>
             </td>
-            <td style="text-align:right;vertical-align:middle;">${emailStatusBadge(p)}</td>
+            <td style="text-align:right;vertical-align:middle;">
+              <table cellpadding="0" cellspacing="0"><tr>
+                ${viewReportLink ? `<td style="padding-right:10px;vertical-align:middle;">${viewReportLink}</td>` : ""}
+                <td style="vertical-align:middle;">${emailStatusBadge(p)}</td>
+              </tr></table>
+            </td>
           </tr></table>
         </td>
       </tr>
@@ -422,12 +439,15 @@ function emailPersonRow(p: PersonData): string {
         </table>
       </td></tr>
     </table>`;
+  };
 }
 
-function emailDeptSection(dept: DepartmentData): string {
-  const statusColor = dept.statusOk ? "#047857" : "#b45309";
-  const statusBg = dept.statusOk ? "#ecfdf5" : "#fffbeb";
-  return `
+function makeEmailDeptSection(ctx: RenderContext) {
+  const emailPersonRow = makeEmailPersonRow(ctx);
+  return function emailDeptSection(dept: DepartmentData): string {
+    const statusColor = dept.statusOk ? "#047857" : "#b45309";
+    const statusBg = dept.statusOk ? "#ecfdf5" : "#fffbeb";
+    return `
     <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
       <tr style="background:#0f172a;">
         <td style="padding:10px 14px;">
@@ -441,6 +461,7 @@ function emailDeptSection(dept: DepartmentData): string {
         ${dept.people.map(emailPersonRow).join("")}
       </td></tr>
     </table>`;
+  };
 }
 
 export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string {
@@ -602,7 +623,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     ${alertsSection}
     ${progressSection}
 
-    ${data.departments.map(emailDeptSection).join("")}
+    ${data.departments.map(makeEmailDeptSection(ctx)).join("")}
 
     ${pdfCta}
 
