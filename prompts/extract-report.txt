@@ -36,6 +36,7 @@ Given raw text from a daily report (which may be a PDF, document, or plain text)
 
 Return this exact JSON structure:
 {
+  "reportDate": "YYYY-MM-DD string for the date the work was performed — look for any date in the document header, title, subject line, or body (e.g. 'Weekly Update March 31', 'Date: 3/31/2026', 'Friday March 31'). This is the date of the work, not the submission date. Return empty string if truly no date is found.",
   "summary": "1-2 sentence plain English summary that MUST include the total hours worked and key counts (e.g. '4 hours on reservations, 15 calls to travel advisers, 1 hour on outreach')",
   "tasks": [
     {

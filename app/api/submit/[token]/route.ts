@@ -153,8 +153,32 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
     }
   }
 
-  const today = new Date();
+  const uploadedAt = new Date();
+  const today = new Date(uploadedAt);
   today.setHours(0, 0, 0, 0);
+
+  // Timezone-aware default: uploads between UTC 00:00–08:00 are almost certainly
+  // US evening submissions (ET=UTC-4, PT=UTC-8) — treat the prior calendar day
+  // as the likely report date if extraction fails.
+  const utcHour = uploadedAt.getUTCHours();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const likelyDefault = utcHour < 8 ? yesterday : today;
+
+  // Resolve report date: prefer extracted date (most reliable), then timezone-aware default
+  let resolvedReportDate: Date = likelyDefault;
+  if (extracted.reportDate) {
+    try {
+      const candidate = new Date(extracted.reportDate);
+      if (!isNaN(candidate.getTime())) {
+        const diffDays = Math.abs((candidate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 7) {
+          candidate.setUTCHours(0, 0, 0, 0);
+          resolvedReportDate = candidate;
+        }
+      }
+    } catch { /* fall through to likelyDefault */ }
+  }
 
   // Create Report record
   const report = await prisma.report.create({
@@ -163,6 +187,7 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
       source: "pdf_upload",
       rawText: rawText.slice(0, 10000),
       rawPdfUrl: publicUrl,
+      reportDate: resolvedReportDate,
       parsed: true,
     },
   });

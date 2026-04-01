@@ -28,7 +28,7 @@ RULE 5 - PRESERVE ALL SPECIFIC DATA. Extract and preserve every specific data po
 RULE 6 - OUTPUT FORMAT. Return ONLY a valid JSON object. The first character must be { and the last must be }. Use these exact top-level fields:
 {
   "personName": string or "" if not found,
-  "reportDate": string (YYYY-MM-DD) or "" if not found,
+  "reportDate": "YYYY-MM-DD for the date the work was performed — search the entire document for any date in the header, title, subject, or body such as 'Weekly Update March 31', 'Date: 3/31/2026', 'Friday March 31', or any reference to the reporting period. This is the date the work happened, not today's date. Return empty string only if absolutely no date can be found anywhere in the document.",
   "department": string or "" if not found,
   "plannedObjectives": [{ "objective": string, "completionNote": string }],
   "activities": [{ "startTime": string, "endTime": string, "durationHours": number, "description": string }],
@@ -79,6 +79,7 @@ export interface ExtractedReportData {
   totalHours: number | null;
   riskSignals: string[];
   projectsMentioned: string[];
+  reportDate?: string | null; // YYYY-MM-DD extracted from report content
   pages?: { pageNumber: number; includeVisual: boolean }[];
 }
 
@@ -131,6 +132,7 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
     totalHours: vision.totalHoursWorked || null,
     riskSignals: vision.risksAndEscalations,
     projectsMentioned: vision.projects.map((p) => p.projectName).filter(Boolean),
+    reportDate: vision.reportDate || null,
     pages: [],
   };
 }
@@ -499,6 +501,7 @@ export async function generateExecutiveSummaryV2(context: {
   reportDetailLevel?: number;
   departmentOrdering?: string;
   departmentOrder?: string[];
+  reportingWindowStart?: string | null; // ISO date — only reports >= this qualify for Notable Progress
 }): Promise<string> {
   const { apiKey, ...rest } = context;
   const prompt = loadPrompt("executive-summary-v2.txt");
