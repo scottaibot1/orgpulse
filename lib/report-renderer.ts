@@ -3,6 +3,7 @@
 export interface HighlightItem {
   type: "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker";
   text: string;
+  subcategory?: string; // Optional group label rendered as a divider above consecutive items sharing this label
 }
 
 export interface TimeAllocationItem {
@@ -20,6 +21,7 @@ export interface PersonData {
   timeAllocation: TimeAllocationItem[];
   timeAllocationEstimated?: boolean;
   highlights: HighlightItem[];
+  overflowNote?: string; // e.g. "12 additional tasks in pipeline — view full report"
 }
 
 export interface DepartmentData {
@@ -137,7 +139,15 @@ function personInitial(name: string) {
 
 // ─── Category-grouped highlights ─────────────────────────────────────────────
 
-// Group highlights by type, inject a category label row before each new group
+// Render OVERDUE prefix in red bold inside the text
+function formatHighlightText(text: string): string {
+  if (!text.startsWith("OVERDUE")) return text;
+  return text.replace(/^OVERDUE\s*[·\-]?\s*/,
+    '<span style="color:#dc2626;font-weight:800;font-size:10px;letter-spacing:0.04em;">OVERDUE</span> · ');
+}
+
+// Group highlights by type, inject a category label row before each new group,
+// and inject subcategory dividers when the subcategory field changes within a type.
 function groupedHighlightsPdf(highlights: HighlightItem[]): string {
   if (!highlights || !highlights.length) return "";
   const safe = highlights.filter(Boolean);
@@ -145,15 +155,21 @@ function groupedHighlightsPdf(highlights: HighlightItem[]): string {
   const showLabels = distinctTypes.length > 1;
   let out = "";
   let lastType = "";
+  let lastSubcategory: string | undefined = undefined;
   for (const h of safe) {
     const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
     if (showLabels && h.type !== lastType) {
       out += `<div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:8px 0 4px;">${s.categoryLabel.toUpperCase()}</div>`;
       lastType = h.type;
+      lastSubcategory = undefined;
+    }
+    if (h.subcategory && h.subcategory !== lastSubcategory) {
+      out += `<div style="font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;margin:6px 0 3px;padding-bottom:2px;border-bottom:1px solid #e2e8f0;">${h.subcategory}</div>`;
+      lastSubcategory = h.subcategory;
     }
     out += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 4px 4px 0;">
       <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${s.icon}</span>
-      <span style="font-size:12px;color:${s.color};line-height:1.5;">${h.text}</span>
+      <span style="font-size:12px;color:${s.color};line-height:1.5;">${formatHighlightText(h.text)}</span>
     </div>`;
   }
   return out;
@@ -166,16 +182,22 @@ function groupedHighlightsEmail(highlights: HighlightItem[]): string {
   const showLabels = distinctTypes.length > 1;
   let out = "";
   let lastType = "";
+  let lastSubcategory: string | undefined = undefined;
   for (const h of safe) {
     const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
     if (showLabels && h.type !== lastType) {
       out += `<tr><td style="padding:7px 0 3px;font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;">${s.categoryLabel.toUpperCase()}</td></tr>`;
       lastType = h.type;
+      lastSubcategory = undefined;
+    }
+    if (h.subcategory && h.subcategory !== lastSubcategory) {
+      out += `<tr><td style="padding:5px 0 2px;font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e2e8f0;">${h.subcategory}</td></tr>`;
+      lastSubcategory = h.subcategory;
     }
     out += `<tr><td style="padding:3px 0;">
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
-        <td style="width:24px;vertical-align:top;padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${s.icon}</td>
-        <td style="padding:5px 9px 5px 6px;background:${s.bg};font-size:12px;color:${s.color};line-height:1.5;">${h.text}</td>
+        <td width="24" valign="top" style="padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${s.icon}</td>
+        <td style="padding:5px 9px 5px 6px;background:${s.bg};font-size:12px;color:${s.color};line-height:1.5;">${formatHighlightText(h.text)}</td>
       </tr></table>
     </td></tr>`;
   }
@@ -260,6 +282,7 @@ function pdfPersonCard(p: PersonData): string {
       </div>
       <div style="padding:10px 13px;">
         ${groupedHighlightsPdf(p.highlights ?? [])}
+        ${p.overflowNote ? `<div style="margin-top:6px;padding:6px 10px;background:#f8fafc;border-radius:4px;border:1px dashed #cbd5e1;font-size:11px;color:#64748b;font-style:italic;">${p.overflowNote}</div>` : ""}
         ${pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated)}
       </div>
     </div>`;
@@ -482,6 +505,17 @@ function makeEmailPersonRow(ctx: RenderContext) {
       <tr><td style="padding:8px 12px;">
         <table cellpadding="0" cellspacing="0" width="100%">
           ${groupedHighlightsEmail(p.highlights ?? [])}
+          ${p.overflowNote ? (() => {
+            const overflowHref = reportLink?.fileUrl
+              ? reportLink.fileUrl
+              : ctx.appUrl && reportLink?.parsedReportId
+                ? `${ctx.appUrl}/report/${reportLink.parsedReportId}`
+                : null;
+            const overflowText = overflowHref
+              ? `${p.overflowNote.replace("view full report", "")} <a href="${overflowHref}" style="color:#6366f1;text-decoration:underline;">view full report</a>`
+              : p.overflowNote;
+            return `<tr><td style="padding:5px 0 2px;"><span style="font-size:11px;color:#64748b;font-style:italic;">${overflowText}</span></td></tr>`;
+          })() : ""}
         </table>
       </td></tr>
       ${(p.timeAllocation ?? []).length > 0 ? emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated) : ""}
