@@ -18,6 +18,7 @@ export interface PersonData {
   daysSinceReport: number;
   hoursWorked: number | null;
   timeAllocation: TimeAllocationItem[];
+  timeAllocationEstimated?: boolean;
   highlights: HighlightItem[];
 }
 
@@ -177,8 +178,9 @@ function pdfStatusBadge(p: PersonData): string {
   return `<span style="display:inline-block;background:#fee2e2;color:#991b1b;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;">⚠ MISSING</span>`;
 }
 
-function pdfTimeBars(alloc: TimeAllocationItem[]): string {
+function pdfTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
   if (!alloc || !alloc.length) return "";
+  const sectionLabel = estimated ? "(Estimated Time Spent)" : "Time Allocation";
   const rows = alloc
     .map(
       (t, i) => `
@@ -193,7 +195,32 @@ function pdfTimeBars(alloc: TimeAllocationItem[]): string {
       </div>`
     )
     .join("");
-  return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">${rows}</div>`;
+  return `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">
+    <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${sectionLabel}</div>
+    ${rows}
+  </div>`;
+}
+
+function emailTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
+  if (!alloc || !alloc.length) return "";
+  const sectionLabel = estimated ? "Estimated Time Spent" : "Time Allocation";
+  const rows = alloc.map((t, i) => {
+    const color = BAR_COLORS[i % BAR_COLORS.length];
+    const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
+    const restPct = 100 - barPct;
+    return `<tr><td style="padding:2px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
+      <td style="width:80px;font-size:10px;color:#64748b;padding-right:6px;vertical-align:middle;white-space:nowrap;">${t.label}</td>
+      <td style="vertical-align:middle;padding:0 4px;"><table cellpadding="0" cellspacing="0" width="100%" style="border-radius:3px;overflow:hidden;"><tr>
+        <td width="${barPct}%" height="6" bgcolor="${color}" style="background:${color};font-size:0;line-height:0;">&#8203;</td>
+        ${restPct > 0 ? `<td width="${restPct}%" height="6" bgcolor="#f1f5f9" style="background:#f1f5f9;font-size:0;line-height:0;">&#8203;</td>` : ""}
+      </tr></table></td>
+      <td style="width:30px;font-size:10px;color:#64748b;padding-left:4px;text-align:right;vertical-align:middle;white-space:nowrap;">${t.hours}h</td>
+    </tr></table></td></tr>`;
+  }).join("");
+  return `<tr><td style="padding:6px 12px 10px;border-top:1px dashed #e2e8f0;">
+    <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">${sectionLabel}</div>
+    <table cellpadding="0" cellspacing="0" width="100%">${rows}</table>
+  </td></tr>`;
 }
 
 function pdfPersonCard(p: PersonData): string {
@@ -211,7 +238,7 @@ function pdfPersonCard(p: PersonData): string {
       </div>
       <div style="padding:10px 13px;">
         ${groupedHighlightsPdf(p.highlights ?? [])}
-        ${pdfTimeBars(p.timeAllocation ?? [])}
+        ${pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated)}
       </div>
     </div>`;
 }
@@ -238,6 +265,9 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const { orgName, summaryDate, createdAt } = ctx;
   const cs = data.completenessScore ?? { totalExpected: 0, freshToday: 0, percentage: 0, standIns: [], missing: [], notScheduledToday: [] };
   const progressGroups = normalizeProgress(data.notableProgress);
+  const totalHoursAll = Math.round(
+    (data.departments ?? []).flatMap(d => (d.people ?? [])).reduce((s, p) => s + (p.hoursWorked ?? 0), 0)
+  );
 
   const formattedDate = summaryDate.toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -352,23 +382,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
         <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:3px;">Generated ${formattedGenerated}</div>
       </div>
     </div>
-    <div style="background:rgba(255,255,255,0.08);border-left:4px solid #818cf8;border-radius:0 10px 10px 0;padding:16px 20px;">
+    <div style="background:#1a2744;border-left:4px solid #818cf8;border-radius:6px;padding:16px 20px;">
       <div style="font-size:10px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">⚡ Today's Pulse</div>
-      <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;letter-spacing:-0.3px;">${data.todaysPulse}</div>
+      <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.55;letter-spacing:-0.2px;">${data.todaysPulse}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
+        <span style="background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">✓ ${cs.freshToday} submitted</span>
+        ${missing.length > 0 ? `<span style="background:#7f1d1d;color:#fca5a5;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⚠ ${missing.length} missing</span>` : `<span style="background:#064e3b;color:#6ee7b7;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">✓ All reported</span>`}
+        <span style="background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">📊 ${pct}% rate</span>
+        ${totalHoursAll > 0 ? `<span style="background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⏱ ${totalHoursAll}h logged</span>` : ""}
+      </div>
     </div>
   </div>
 
   ${attentionSection}
-
-  <div style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:14px 40px;">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;">Completeness</span>
-      <span style="background:${pctBg};color:${pctColor};border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;">${cs.freshToday} of ${cs.totalExpected} reported · ${pct}%</span>
-      ${standIns.length > 0 ? `<span style="background:#fefce8;color:#92400e;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⏳ ${standIns.length} stand-in${standIns.length > 1 ? "s" : ""}</span>` : ""}
-      ${missing.length > 0 ? `<span style="background:#fef2f2;color:#991b1b;border-radius:20px;padding:3px 11px;font-size:11px;font-weight:600;">⚠ ${missing.length} missing</span>` : ""}
-    </div>
-    ${standInsDetail}${missingDetail}
-  </div>
 
   <div style="padding:26px 40px;">
     <div style="font-size:13px;line-height:1.8;color:#334155;margin-bottom:22px;padding:15px 18px;background:#f8fafc;border-radius:8px;border-left:4px solid #6366f1;">
@@ -410,7 +436,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
           const label = reportLink.isStandIn
             ? `View Report (stand-in, ${reportLink.date})`
             : "View Report";
-          return `<a href="${ctx.appUrl}/report/${reportLink.parsedReportId}" style="font-size:10px;color:#6366f1;text-decoration:none;font-weight:600;white-space:nowrap;">${label} →</a>`;
+          return `<a href="${ctx.appUrl}/report/${reportLink.parsedReportId}" style="display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">${label} →</a>`;
         })()
       : "";
     return `
@@ -441,6 +467,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
           ${groupedHighlightsEmail(p.highlights ?? [])}
         </table>
       </td></tr>
+      ${(p.timeAllocation ?? []).length > 0 ? emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated) : ""}
     </table>`;
   };
 }
@@ -471,19 +498,16 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const { orgName, summaryDate, totalSubmissions, missingSubmissions, pdfUrl } = ctx;
   const cs = data.completenessScore ?? { totalExpected: 0, freshToday: 0, percentage: 0, standIns: [], missing: [], notScheduledToday: [] };
   const progressGroups = normalizeProgress(data.notableProgress);
-
-  const total = totalSubmissions + missingSubmissions;
-  const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
-  const rateColor = rate === 100 ? "#047857" : rate >= 70 ? "#b45309" : "#dc2626";
-  const rateBg = rate === 100 ? "#ecfdf5" : rate >= 70 ? "#fffbeb" : "#fef2f2";
+  const totalHoursAll = Math.round(
+    (data.departments ?? []).flatMap(d => (d.people ?? [])).reduce((s, p) => s + (p.hoursWorked ?? 0), 0)
+  );
 
   const formattedDate = summaryDate.toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
   const pct = cs.percentage ?? 0;
-  const pctColor = pct === 100 ? "#047857" : pct >= 70 ? "#b45309" : "#dc2626";
-  const pctBg = pct === 100 ? "#ecfdf5" : pct >= 70 ? "#fffbeb" : "#fef2f2";
+  const missingCount = (cs.missing ?? []).length;
 
   // Attention items — grouped by department
   const emailAttentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
@@ -583,36 +607,20 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
       </td>
     </tr></table>
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
-      <td style="background:rgba(255,255,255,0.08);border-left:4px solid #818cf8;border-radius:0 10px 10px 0;padding:16px 20px;">
+      <td style="background:#1a2744;border-left:4px solid #818cf8;border-radius:6px;padding:16px 20px;">
         <div style="font-size:10px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">⚡ Today's Pulse</div>
-        <div style="font-size:20px;font-weight:700;color:#ffffff;line-height:1.5;letter-spacing:-0.3px;">${data.todaysPulse}</div>
+        <div style="font-size:16px;font-weight:700;color:#ffffff;line-height:1.6;letter-spacing:-0.2px;">${data.todaysPulse}</div>
+        <table cellpadding="0" cellspacing="0" style="margin-top:12px;"><tr>
+          <td style="padding-right:6px;"><span style="display:inline-block;background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">✓ ${cs.freshToday} submitted</span></td>
+          ${missingCount > 0 ? `<td style="padding-right:6px;"><span style="display:inline-block;background:#7f1d1d;color:#fca5a5;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">⚠ ${missingCount} missing</span></td>` : `<td style="padding-right:6px;"><span style="display:inline-block;background:#064e3b;color:#6ee7b7;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">✓ All in</span></td>`}
+          <td style="padding-right:6px;"><span style="display:inline-block;background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">📊 ${pct}% rate</span></td>
+          ${totalHoursAll > 0 ? `<td><span style="display:inline-block;background:rgba(255,255,255,0.13);color:#ffffff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">⏱ ${totalHoursAll}h logged</span></td>` : ""}
+        </tr></table>
       </td>
     </tr></table>
   </td></tr>
 
   ${emailAttentionSection}
-
-  <!-- STATS ROW -->
-  <tr><td style="border-bottom:1px solid #e2e8f0;">
-    <table cellpadding="0" cellspacing="0" width="100%"><tr>
-      <td style="flex:1;padding:14px 16px;text-align:center;border-right:1px solid #e2e8f0;">
-        <div style="font-size:22px;font-weight:700;color:#047857;">${totalSubmissions}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em;">Submitted</div>
-      </td>
-      <td style="flex:1;padding:14px 16px;text-align:center;border-right:1px solid #e2e8f0;">
-        <div style="font-size:22px;font-weight:700;color:#dc2626;">${missingSubmissions}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em;">Missing</div>
-      </td>
-      <td style="flex:1;padding:14px 16px;text-align:center;border-right:1px solid #e2e8f0;">
-        <div style="font-size:22px;font-weight:700;display:inline-block;background:${rateBg};color:${rateColor};border-radius:6px;padding:1px 8px;">${rate}%</div>
-        <div style="font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em;">Rate</div>
-      </td>
-      <td style="flex:1;padding:14px 16px;text-align:center;">
-        <div style="font-size:22px;font-weight:700;display:inline-block;background:${pctBg};color:${pctColor};border-radius:6px;padding:1px 8px;">${cs.freshToday}/${cs.totalExpected}</div>
-        <div style="font-size:10px;color:#64748b;margin-top:2px;text-transform:uppercase;letter-spacing:0.05em;">Reported</div>
-      </td>
-    </tr></table>
-  </td></tr>
 
   <!-- BODY -->
   <tr><td style="padding:22px 24px;">
