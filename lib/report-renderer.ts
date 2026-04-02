@@ -277,17 +277,8 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   });
 
   const pct = cs.percentage ?? 0;
-  const pctColor = pct === 100 ? "#047857" : pct >= 70 ? "#b45309" : "#dc2626";
-  const pctBg = pct === 100 ? "#ecfdf5" : pct >= 70 ? "#fffbeb" : "#fef2f2";
-
   const standIns = cs.standIns ?? [];
   const missing = cs.missing ?? [];
-  const standInsDetail = standIns.length > 0
-    ? `<div style="font-size:11px;color:#92400e;margin-top:4px;">⏳ Stand-ins: ${standIns.map((s) => `${s.name} (${s.daysSince}d ago)`).join(", ")}</div>`
-    : "";
-  const missingDetail = missing.length > 0
-    ? `<div style="font-size:11px;color:#991b1b;margin-top:4px;">⚠ No data: ${missing.map((m) => m.name).join(", ")}</div>`
-    : "";
 
   // Attention items — grouped by department
   const attentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
@@ -495,7 +486,7 @@ function makeEmailDeptSection(ctx: RenderContext) {
 }
 
 export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string {
-  const { orgName, summaryDate, totalSubmissions, missingSubmissions, pdfUrl } = ctx;
+  const { orgName, summaryDate, pdfUrl } = ctx;
   const cs = data.completenessScore ?? { totalExpected: 0, freshToday: 0, percentage: 0, standIns: [], missing: [], notScheduledToday: [] };
   const progressGroups = normalizeProgress(data.notableProgress);
   const totalHoursAll = Math.round(
