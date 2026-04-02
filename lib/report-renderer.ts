@@ -277,7 +277,6 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   });
 
   const pct = cs.percentage ?? 0;
-  const standIns = cs.standIns ?? [];
   const missing = cs.missing ?? [];
 
   // Attention items — grouped by department
