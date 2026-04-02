@@ -351,13 +351,13 @@ export default function WorkspacePersonDialog({ open, onClose, onSaved, editing,
             )}
           </div>
 
-          {/* Reporting Active toggle */}
+          {/* Include In Reporting toggle */}
           {canToggleReporting && (
-            <div className={`flex items-start justify-between gap-4 py-1 ${executiveTier !== null ? "opacity-40 pointer-events-none" : ""}`}>
+            <div className="flex items-start justify-between gap-4 py-1">
               <div>
-                <Label className="text-sm font-medium text-gray-900">Reporting Active</Label>
+                <Label className="text-sm font-medium text-gray-900">Include In Reporting</Label>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  When off, this person is excluded from daily report collection and org chart submission tracking.
+                  When off, this person is completely excluded from all generated reports, emails, metrics, and submission tracking.
                 </p>
               </div>
               <button

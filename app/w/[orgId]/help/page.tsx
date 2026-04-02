@@ -267,7 +267,7 @@ export default function HelpPage() {
           </div>
           <h3 className="font-semibold text-slate-800 mb-3">Reporting active toggle</h3>
           <p className="text-sm text-slate-600 leading-relaxed mb-4">
-            Each person has a <strong>Reporting Active</strong> toggle. When turned off, they are excluded from the completeness scorecard and the executive summary. Use this for people on leave, in a transition, or not yet onboarded.
+            Each person has a <strong>Include In Reporting</strong> toggle. When turned off, they are excluded from the completeness scorecard and the executive summary. Use this for people on leave, in a transition, or not yet onboarded.
           </p>
           <h3 className="font-semibold text-slate-800 mb-3">Roles</h3>
           <div className="space-y-2 mb-4">
@@ -505,7 +505,7 @@ export default function HelpPage() {
             </div>
           </div>
           <p className="text-sm text-slate-600 leading-relaxed mb-4">
-            When you assign an Executive Tier to a person, their <strong>Reporting Active</strong> toggle is automatically turned off and the reporting schedule is greyed out. They won&apos;t appear in the completeness scorecard as a missing submission. Their node in the org chart sits above the department columns with lines connecting to each department they oversee.
+            When you assign an Executive Tier to a person, their <strong>Include In Reporting</strong> toggle is automatically turned off and the reporting schedule is greyed out. They won&apos;t appear in the completeness scorecard as a missing submission. Their node in the org chart sits above the department columns with lines connecting to each department they oversee.
           </p>
           <Callout type="info">
             To assign an executive tier: go to People, open the person&apos;s profile, and select Tier 1 or Tier 2 from the Executive Tier section. Choose which departments they oversee using the department selector that appears.
@@ -629,7 +629,7 @@ export default function HelpPage() {
             {[
               { icon: "📅", title: "Generate at the same time every day", desc: "Set your generation schedule to right after your team's submission deadline — e.g., if everyone submits by 5 PM, generate at 5:30 PM so it's ready for your end-of-day review or morning read." },
               { icon: "⚡", title: "Use Snapshot for quick checks", desc: "Keep your default detail level at Standard, but switch to Snapshot when you just need a fast morning status check. You can always re-generate at a different level." },
-              { icon: "🏥", title: "Turn off Reporting Active for on-leave staff", desc: "When someone is on vacation or leave, toggle off Reporting Active. They'll disappear from the completeness scorecard so you don't see them flagged as missing every day." },
+              { icon: "🏥", title: "Turn off Include In Reporting for on-leave staff", desc: "When someone is on vacation or leave, toggle off Include In Reporting. They'll disappear from the completeness scorecard so you don't see them flagged as missing every day." },
               { icon: "📊", title: "Use AI Determined ordering when you have alerts", desc: "Switch to AI Determined department ordering on days when there are open alerts or known issues. The AI will surface the most urgent departments first." },
               { icon: "🔖", title: "Encourage natural language reports", desc: "Team members don't need special formatting. OrgRise AI reads natural language well. A report that says \"I spent the morning on the Henderson proposal, got to 60%, still waiting on legal\" produces excellent structured output." },
               { icon: "🧠", title: "Use Full Intelligence for quarterly reviews", desc: "Level 5 captures every data point from every report. It's ideal when you need a comprehensive record — for board prep, performance reviews, or audits." },

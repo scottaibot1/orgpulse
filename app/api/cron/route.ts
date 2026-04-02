@@ -95,6 +95,8 @@ export async function POST(request: NextRequest) {
       const autoReportDetailLevel = (org.workspaceSettings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? (org.workspaceSettings as { reportDetailLevel?: number } | null)?.reportDetailLevel ?? 3;
       const departmentOrdering = (org.workspaceSettings as { departmentOrdering?: string } | null)?.departmentOrdering ?? "manual";
       const biweeklyStartDate = (org.workspaceSettings as { biweeklyStartDate?: Date | null } | null)?.biweeklyStartDate ?? null;
+      const lastGeneratedAt = (org.workspaceSettings as { lastReportGeneratedAt?: Date | null } | null)?.lastReportGeneratedAt ?? null;
+      const reportingWindowStart = lastGeneratedAt ? lastGeneratedAt.toISOString().split("T")[0] : null;
 
       // Get active users per scope — include schedule fields
       const userWhere: Record<string, unknown> = {
@@ -296,6 +298,7 @@ export async function POST(request: NextRequest) {
         reportDetailLevel: autoReportDetailLevel,
         departmentOrdering,
         departmentOrder: deptOrder.map((d) => d.name),
+        reportingWindowStart,
       });
 
       // Save daily summary
@@ -308,6 +311,12 @@ export async function POST(request: NextRequest) {
           missingSubmissions: dueTodayUsers.length - freshCount,
           alertCount: recentAlerts.length,
         },
+      });
+
+      // Update lastReportGeneratedAt so the next run knows its window start
+      await prisma.workspaceSettings.updateMany({
+        where: { orgId: org.id },
+        data: { lastReportGeneratedAt: new Date() },
       });
 
       // Prune to keep only the 30 most recently generated summaries for this org

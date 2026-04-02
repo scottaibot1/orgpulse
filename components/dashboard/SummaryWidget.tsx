@@ -1,27 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, RefreshCw, FileDown, Mail, AlertCircle } from "lucide-react";
+import { Sparkles, RefreshCw, FileDown, Mail, AlertCircle, Calendar } from "lucide-react";
 
 interface Props {
   orgId: string;
   accentColor: string;
   lastSummary: { id: string; date: string } | null;
+  availableDays?: string[]; // YYYY-MM-DD sorted newest first
 }
 
-export default function SummaryWidget({ orgId, accentColor, lastSummary }: Props) {
+function formatDayOption(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const today = new Date().toISOString().split("T")[0];
+  const isToday = dateStr === today;
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + (isToday ? " (today)" : "");
+}
+
+export default function SummaryWidget({ orgId, accentColor, lastSummary, availableDays = [] }: Props) {
   const [generating, setGenerating] = useState(false);
   const [summaryId, setSummaryId] = useState<string | null>(lastSummary?.id ?? null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(lastSummary?.date ?? null);
   const [error, setError] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<{ sent: boolean; to: string | null; error: string | null } | null>(null);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [selectedDay, setSelectedDay] = useState<string>(availableDays[0] ?? todayStr);
+
   async function generate() {
     setGenerating(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/w/${orgId}/summary`, { method: "POST" });
+      const res = await fetch(`/api/w/${orgId}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetDate: selectedDay }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -69,6 +84,24 @@ export default function SummaryWidget({ orgId, accentColor, lastSummary }: Props
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Day selector */}
+          {availableDays.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3 text-slate-400 flex-shrink-0" />
+              <select
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-700 focus:outline-none focus:ring-1"
+                style={{ "--tw-ring-color": accentColor } as React.CSSProperties}
+                disabled={generating}
+              >
+                {availableDays.map((d) => (
+                  <option key={d} value={d}>{formatDayOption(d)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {generating && (
             <div className="flex items-center gap-2 text-xs text-slate-400 mr-1">
               <div

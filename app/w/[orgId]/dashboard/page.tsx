@@ -86,6 +86,7 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
       select: {
         id: true,
         submittedAt: true,
+        reportDate: true,
         source: true,
         rawPdfUrl: true,
         parsedReport: { select: { id: true } },
@@ -176,6 +177,7 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
     id: r.id,
     userId: r.user.id,
     submittedAt: r.submittedAt.toISOString(),
+    reportDate: (r.reportDate ?? r.submittedAt).toISOString().split("T")[0],
     source: r.source as "form" | "pdf_upload" | "email",
     rawPdfUrl: r.rawPdfUrl,
     parsedReportId: r.parsedReport?.id ?? null,
@@ -183,6 +185,9 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
     departmentName: r.user.departmentMemberships[0]?.department?.name ?? "",
     departmentColor: r.user.departmentMemberships[0]?.department?.color ?? null,
   }));
+
+  // Compute unique day buckets from reports (for date selector in SummaryWidget)
+  const availableDays = Array.from(new Set(reportRows.map((r) => r.reportDate))).sort((a, b) => b.localeCompare(a));
 
   const stats = [
     { label: "Submitted Today", value: submittedCount, sub: `of ${people.length} people`, icon: CheckCircle, gradient: "from-emerald-500 to-teal-600", href: `/w/${orgId}/snapshot` },
@@ -302,6 +307,7 @@ export default async function WorkspaceDashboardPage({ params }: Props) {
             orgId={orgId}
             accentColor={accentColor}
             lastSummary={latest ? { id: latest.id, date: latest.createdAt.toISOString() } : null}
+            availableDays={availableDays}
           />
         );
       })()}
