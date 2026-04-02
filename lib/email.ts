@@ -1,5 +1,4 @@
 import { Resend } from "resend";
-import { marked } from "marked";
 import { parseAiSummary, renderEmailHtml } from "@/lib/report-renderer";
 
 function getResend() {
@@ -49,73 +48,41 @@ export async function sendSummaryEmail({
     }
   }
   if (useLegacy) {
-    // Legacy markdown fallback
-    const total = totalSubmissions + missingSubmissions;
-    const rate = total > 0 ? Math.round((totalSubmissions / total) * 100) : 0;
+    // Fallback: send a clean notification email pointing to the PDF
+    // (never fall back to marked.parse(markdown) since that renders raw JSON when AI returns structured data)
     const formattedDate = summaryDate.toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
-    const bodyHtml = marked.parse(markdown) as string;
-    const rateColor = rate === 100 ? "#15803d" : rate >= 70 ? "#b45309" : "#b91c1c";
-    const rateBg   = rate === 100 ? "#f0fdf4" : rate >= 70 ? "#fffbeb" : "#fef2f2";
-
     html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Executive Summary — ${orgName}</title>
-<style>
-  body { margin: 0; padding: 0; background: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #1e293b; }
-  .wrapper { max-width: 620px; margin: 32px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-  .top-bar { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 24px 32px; }
-  .top-bar h1 { margin: 0; color: #fff; font-size: 18px; font-weight: 700; }
-  .top-bar p { margin: 4px 0 0; color: rgba(255,255,255,0.75); font-size: 13px; }
-  .stats { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; }
-  .stat { flex: 1; padding: 16px 20px; text-align: center; border-right: 1px solid #e2e8f0; }
-  .stat:last-child { border-right: none; }
-  .stat .val { font-size: 22px; font-weight: 700; }
-  .stat .lbl { font-size: 11px; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .body { padding: 28px 32px; }
-  .body h1 { font-size: 16px; font-weight: 700; color: #1e293b; margin: 20px 0 6px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
-  .body h2 { font-size: 13px; font-weight: 700; color: #475569; margin: 16px 0 4px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .body p { font-size: 14px; line-height: 1.65; color: #475569; margin: 0 0 10px; }
-  .body ul { padding-left: 20px; margin: 0 0 10px; }
-  .body li { font-size: 14px; line-height: 1.65; color: #475569; margin-bottom: 3px; }
-  .body strong { color: #1e293b; }
-  .cta { margin: 24px 32px 32px; text-align: center; }
-  .cta a { display: inline-block; background: #6366f1; color: #fff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px; }
-  .footer { padding: 16px 32px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; }
-  .footer span { font-size: 11px; color: #94a3b8; }
-</style>
 </head>
-<body>
-<div class="wrapper">
-  <div class="top-bar">
-    <h1>${orgName} — Executive Summary</h1>
-    <p>${formattedDate}</p>
-  </div>
-  <div class="stats">
-    <div class="stat">
-      <div class="val" style="color:#15803d">${totalSubmissions}</div>
-      <div class="lbl">Submitted</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:#b91c1c">${missingSubmissions}</div>
-      <div class="lbl">Missing</div>
-    </div>
-    <div class="stat">
-      <div class="val" style="color:${rateColor};background:${rateBg};border-radius:6px;display:inline-block;padding:2px 8px">${rate}%</div>
-      <div class="lbl">Rate</div>
-    </div>
-  </div>
-  <div class="body">${bodyHtml}</div>
-  <div class="cta"><a href="${pdfUrl}">View &amp; Download PDF</a></div>
-  <div class="footer">
-    <span>${orgName} · Confidential</span>
-    <span>Sent by OrgRise AI</span>
-  </div>
-</div>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;">
+<table cellpadding="0" cellspacing="0" width="100%" style="background:#f8fafc;">
+<tr><td style="padding:24px 16px;">
+<table cellpadding="0" cellspacing="0" width="560" align="center" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;max-width:100%;">
+  <tr><td style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:24px 28px;">
+    <div style="font-size:18px;font-weight:800;color:#fff;">${orgName}</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:3px;text-transform:uppercase;letter-spacing:0.08em;">Executive Summary · ${formattedDate}</div>
+  </td></tr>
+  <tr><td style="padding:28px;">
+    <p style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.7;">Your executive summary for <strong>${orgName}</strong> has been generated. Click below to view the full formatted report.</p>
+    <table cellpadding="0" cellspacing="0"><tr><td>
+      <a href="${pdfUrl}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">View Full Report →</a>
+    </td></tr></table>
+  </td></tr>
+  <tr><td style="padding:14px 28px;border-top:1px solid #e2e8f0;">
+    <table cellpadding="0" cellspacing="0" width="100%"><tr>
+      <td style="font-size:10px;color:#94a3b8;">${orgName} · Confidential</td>
+      <td style="text-align:right;font-size:10px;color:#94a3b8;">Sent by OrgRise AI</td>
+    </tr></table>
+  </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>`;
   }

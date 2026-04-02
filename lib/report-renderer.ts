@@ -332,7 +332,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const progressSection = progressGroups.length > 0 ? (() => {
     const deptBlocks = progressGroups.map((g) => `
       ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
-      ${g.items.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
     `).join("");
     return `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
       <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🏆 Notable Progress</div>
@@ -558,7 +558,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const progressSection = progressGroups.length > 0 ? (() => {
     const deptBlocks = progressGroups.map((g) => `
       ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
-      ${g.items.map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
     `).join("");
     return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;overflow:hidden;">
       <tr><td style="padding:14px 16px;">
