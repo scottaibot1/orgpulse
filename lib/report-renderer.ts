@@ -32,6 +32,8 @@ export interface DepartmentData {
   statusLabel: string;
   statusOk: boolean;
   people: PersonData[];
+  notExpectedToday?: boolean; // True for departments not scheduled on the generation date
+  scheduleLabel?: string;     // e.g. "reports weekly on Fridays"
 }
 
 export interface AttentionItem {
@@ -289,6 +291,14 @@ function pdfPersonCard(p: PersonData): string {
 }
 
 function pdfDeptSection(dept: DepartmentData): string {
+  if (dept.notExpectedToday) {
+    return `
+    <div style="margin-bottom:14px;padding:10px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px;">${dept.emoji}</span>
+      <span style="font-size:13px;font-weight:600;color:#475569;">${dept.name}</span>
+      <span style="font-size:11px;color:#94a3b8;">— ${dept.scheduleLabel ?? "not reporting today"}</span>
+    </div>`;
+  }
   const statusColor = dept.statusOk ? "#047857" : "#b45309";
   const statusBg = dept.statusOk ? "#ecfdf5" : "#fffbeb";
   return `
@@ -475,7 +485,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
               ? `${ctx.appUrl}/report/${reportLink.parsedReportId}`
               : null;
           if (!href) return "";
-          const label = reportLink.isStandIn ? `View Report (${reportLink.date})` : "View Report";
+          const label = reportLink.isStandIn ? `View Submitted Report (stand-in, ${reportLink.date})` : "View Submitted Report";
           return `<a href="${href}" style="display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">${label} →</a>`;
         })()
       : "";
@@ -512,7 +522,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
                 ? `${ctx.appUrl}/report/${reportLink.parsedReportId}`
                 : null;
             const overflowText = overflowHref
-              ? `${p.overflowNote.replace("view full report", "")} <a href="${overflowHref}" style="color:#6366f1;text-decoration:underline;">view full report</a>`
+              ? `${p.overflowNote.replace(/view (full|submitted) report/i, "")} <a href="${overflowHref}" style="color:#6366f1;text-decoration:underline;">view submitted report</a>`
               : p.overflowNote;
             return `<tr><td style="padding:5px 0 2px;"><span style="font-size:11px;color:#64748b;font-style:italic;">${overflowText}</span></td></tr>`;
           })() : ""}
@@ -526,6 +536,16 @@ function makeEmailPersonRow(ctx: RenderContext) {
 function makeEmailDeptSection(ctx: RenderContext) {
   const emailPersonRow = makeEmailPersonRow(ctx);
   return function emailDeptSection(dept: DepartmentData): string {
+    if (dept.notExpectedToday) {
+      return `
+    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <tr><td style="padding:10px 14px;background:#f8fafc;">
+        <span style="font-size:14px;">${dept.emoji}</span>
+        <span style="font-size:12px;font-weight:600;color:#475569;"> ${dept.name}</span>
+        <span style="font-size:11px;color:#94a3b8;"> — ${dept.scheduleLabel ?? "not reporting today"}</span>
+      </td></tr>
+    </table>`;
+    }
     const statusColor = dept.statusOk ? "#047857" : "#b45309";
     const statusBg = dept.statusOk ? "#ecfdf5" : "#fffbeb";
     return `

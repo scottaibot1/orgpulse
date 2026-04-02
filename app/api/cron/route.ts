@@ -2,50 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
+import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
 
 export const maxDuration = 60;
-
-/**
- * Determines whether a person is due to submit a report today.
- * reportDueDays: for daily/custom/biweekly/weekly = day-of-week indices (0=Sun…6=Sat)
- *                for monthly = day-of-month numbers (1–31)
- */
-function isPersonDueToday(
-  cadence: string,
-  reportDueDays: number[],
-  biweeklyWeek: string,
-  today: Date,
-  biweeklyStartDate: Date | null
-): boolean {
-  const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
-  const dayOfMonth = today.getDate();
-
-  switch (cadence) {
-    case "daily":
-      return true;
-
-    case "weekly":
-      return reportDueDays.includes(dayOfWeek);
-
-    case "biweekly": {
-      if (!reportDueDays.includes(dayOfWeek)) return false;
-      if (!biweeklyStartDate) return true; // no start date set, default to due
-      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-      const weeksSinceStart = Math.floor((today.getTime() - biweeklyStartDate.getTime()) / msPerWeek);
-      const isWeekA = weeksSinceStart % 2 === 0;
-      return biweeklyWeek === "A" ? isWeekA : !isWeekA;
-    }
-
-    case "monthly":
-      return reportDueDays.includes(dayOfMonth);
-
-    case "custom":
-      return reportDueDays.includes(dayOfWeek);
-
-    default:
-      return true;
-  }
-}
 
 export async function POST(request: NextRequest) {
   // Verify cron secret
@@ -149,12 +108,13 @@ export async function POST(request: NextRequest) {
         )
       );
 
-      const allUserIds = activeUsers.map((u) => u.id);
+      // Only expected users are included in the report — non-expected users are excluded entirely
+      const expectedUserIds = dueTodayUsers.map((u) => u.id);
 
-      // Get today's parsed reports for all users
+      // Get today's parsed reports for expected users only
       const todayReports = await prisma.parsedReport.findMany({
         where: {
-          userId: { in: allUserIds },
+          userId: { in: expectedUserIds },
           date: { gte: today, lt: dayAfterTomorrow },
         },
         select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
@@ -162,20 +122,18 @@ export async function POST(request: NextRequest) {
 
       const todayReportByUser = new Map(todayReports.map((r) => [r.userId, r]));
 
-      // Get canonical narratives for all users
+      // Get canonical narratives for expected users only
       const narratives = await prisma.canonicalNarrative.findMany({
-        where: { userId: { in: allUserIds } },
+        where: { userId: { in: expectedUserIds } },
       });
       const narrativeByUser = new Map(narratives.map((n) => [n.userId, n]));
 
-      // For ALL users without a fresh today report, find their most recent report within 30 days.
-      // This ensures not-scheduled-today users (weekly, etc.) still appear in the summary
-      // using their last submitted report as a stand-in.
-      const allUsersWithoutTodayReport = allUserIds.filter((id) => !todayReportByUser.has(id));
-      const standInReports = allUsersWithoutTodayReport.length > 0
+      // Stand-ins only for expected users who didn't submit today
+      const expectedWithoutTodayReport = expectedUserIds.filter((id) => !todayReportByUser.has(id));
+      const standInReports = expectedWithoutTodayReport.length > 0
         ? await prisma.parsedReport.findMany({
             where: {
-              userId: { in: allUsersWithoutTodayReport },
+              userId: { in: expectedWithoutTodayReport },
               date: { lt: today, gte: thirtyDaysAgo },
             },
             orderBy: { date: "desc" },
@@ -186,7 +144,7 @@ export async function POST(request: NextRequest) {
 
       const standInByUser = new Map(standInReports.map((r) => [r.userId, r]));
 
-      // Build completeness scorecard (schedule-aware)
+      // Build completeness scorecard — only expected users count
       const standInSummaries: { name: string; daysSince: number }[] = [];
       let freshCount = 0;
 
@@ -201,7 +159,7 @@ export async function POST(request: NextRequest) {
             );
             standInSummaries.push({ name: u.name, daysSince });
           } else {
-            standInSummaries.push({ name: u.name, daysSince: -1 }); // never submitted
+            standInSummaries.push({ name: u.name, daysSince: -1 });
           }
         }
       }
@@ -216,8 +174,26 @@ export async function POST(request: NextRequest) {
         notScheduledToday: notScheduledTodayUsers.map((u) => ({ name: u.name })),
       };
 
-      // Build people array — ALL active users, using stand-in if not due/fresh today
-      const people = activeUsers.map((u) => {
+      // Departments where ZERO expected members exist today → show as placeholder
+      const expectedDeptNames = new Set(
+        dueTodayUsers.map((u) => u.departmentMemberships[0]?.department?.name).filter(Boolean)
+      );
+      const notExpectedDeptSchedules = new Map<string, Set<string>>();
+      for (const u of notScheduledTodayUsers) {
+        const deptName = u.departmentMemberships[0]?.department?.name;
+        if (!deptName || expectedDeptNames.has(deptName)) continue;
+        if (!notExpectedDeptSchedules.has(deptName)) notExpectedDeptSchedules.set(deptName, new Set());
+        notExpectedDeptSchedules.get(deptName)!.add(
+          buildScheduleLabel(u.reportCadence, (u.reportDueDays as number[]) ?? [5])
+        );
+      }
+      const notExpectedDepartments = Array.from(notExpectedDeptSchedules.entries()).map(([name, labels]) => ({
+        name,
+        scheduleLabel: Array.from(labels).join("; "),
+      }));
+
+      // Build people array — expected users only
+      const people = dueTodayUsers.map((u) => {
         const narrative = narrativeByUser.get(u.id);
         const todayReport = todayReportByUser.get(u.id);
         const standIn = standInByUser.get(u.id);
@@ -299,6 +275,7 @@ export async function POST(request: NextRequest) {
         departmentOrdering,
         departmentOrder: deptOrder.map((d) => d.name),
         reportingWindowStart,
+        notExpectedDepartments,
       });
 
       // Save daily summary

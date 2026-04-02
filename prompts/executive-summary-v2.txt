@@ -6,12 +6,13 @@ You will receive a JSON object with:
 - orgName: the organization name
 - summaryDate: the date this report covers
 - completenessScore: { totalExpected, freshToday, standIns (array of {name, daysSince}), percentage, notScheduledToday (optional [{name}]) }
-- people: array of { name, department, narrative, riskSignals, reportDate, isStandIn, daysSinceReport }
+- people: array of { name, department, narrative, riskSignals, reportDate, isStandIn, daysSinceReport } — ONLY people expected to report on this date. Do not invent or add people not in this array.
 - alerts: array of existing alert message strings
 - reportDetailLevel: integer 1–5
 - departmentOrdering: "manual" or "ai_determined"
 - departmentOrder: array of department names in manual order
 - reportingWindowStart: ISO date string or null. Only people whose reportDate >= reportingWindowStart AND isStandIn === false may appear in Notable Progress.
+- notExpectedDepartments: array of { name, scheduleLabel } — departments whose members are NOT expected to report today. These must appear as neutral placeholder entries in the departments output (see below).
 
 Department ordering:
 - If departmentOrdering is "manual" and departmentOrder is provided, present departments in that exact order throughout.
@@ -88,7 +89,9 @@ Output ONLY a valid JSON object. First character must be { and last must be }. N
           ],
           "overflowNote": string (optional — only present when more than 20 ontack items exist)
         }
-      ]
+      ],
+      "notExpectedToday": boolean (optional — true ONLY for departments from notExpectedDepartments),
+      "scheduleLabel": string (optional — only when notExpectedToday is true)
     }
   ]
 }
@@ -129,6 +132,15 @@ notableProgress — Department-grouped wins and milestones from THIS reporting w
 completenessScore — Populate from input completenessScore. "missing" = people with no report at all (daysSinceReport === -1). "standIns" = from input.
 
 departments — One entry per department with active people. Choose an appropriate emoji for the department type: 💼 Sales, 📣 Marketing, ⚙️ Ops, 💰 Finance, 🖥 Engineering, 🎯 Strategy, 🤝 Customer Success, 📦 Logistics, 🏥 HR, 🔬 R&D. Infer department from report content if not explicitly stated.
+
+  NOT-EXPECTED DEPARTMENTS: For each entry in notExpectedDepartments, you MUST include exactly one department entry with:
+  - name: the department name from the input
+  - notExpectedToday: true
+  - scheduleLabel: the scheduleLabel string from the input
+  - emoji: appropriate emoji for the department type
+  - reportedCount: 0, totalCount: 0, statusLabel: the scheduleLabel, statusOk: true
+  - people: [] (empty — these people are excluded from this report)
+  Position these in the departments array in their correct place per departmentOrder. Do NOT include any of these people in metrics, attentionItems, criticalAlerts, or notableProgress.
 
   For each person:
   - status: "fresh" if daysSinceReport === 0, "standin" if isStandIn, "missing" if daysSinceReport === -1
@@ -252,3 +264,5 @@ CRITICAL RULES — VIOLATION = INVALID OUTPUT
 20. Overdue tasks (past due date and not 100% complete) must start with "OVERDUE · " and sort first within their category.
 21. Never emit more than 20 ontack highlights for a single person. Use overflowNote for the remainder.
 22. Urgency sort order within each category: overdue → due ≤7d → due ≤30d → no date → future date.
+23. Every entry in notExpectedDepartments MUST appear in the departments output with notExpectedToday: true and people: []. Never omit them.
+24. People and departments not in the input must never be invented or inferred. Only output what the data contains.

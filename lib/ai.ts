@@ -503,6 +503,7 @@ export async function generateExecutiveSummaryV2(context: {
   departmentOrdering?: string;
   departmentOrder?: string[];
   reportingWindowStart?: string | null; // ISO date — only reports >= this qualify for Notable Progress
+  notExpectedDepartments?: { name: string; scheduleLabel: string }[]; // Departments with no expected members today
 }): Promise<string> {
   const { apiKey, ...rest } = context;
   const prompt = loadPrompt("executive-summary-v2.txt");

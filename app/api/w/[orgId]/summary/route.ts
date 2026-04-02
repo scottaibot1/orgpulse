@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getWorkspaceUser } from "@/lib/auth";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
+import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
 
 export const maxDuration = 300;
 interface Params { params: Promise<{ orgId: string }> }
@@ -36,7 +37,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true, lastReportGeneratedAt: true } } },
+    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true, lastReportGeneratedAt: true, biweeklyStartDate: true } } },
   });
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -73,6 +74,9 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     select: {
       id: true,
       name: true,
+      reportCadence: true,
+      reportDueDays: true,
+      reportBiweeklyWeek: true,
       departmentMemberships: {
         where: { isPrimary: true },
         take: 1,
@@ -85,7 +89,28 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     return NextResponse.json({ error: "No active users to summarize" }, { status: 422 });
   }
 
-  const userIds = activeUsers.map((u) => u.id);
+  // Split users by schedule — only expected users are included in the report
+  const biweeklyStartDate = (org.workspaceSettings as { biweeklyStartDate?: Date | null } | null)?.biweeklyStartDate ?? null;
+  const expectedUsers = activeUsers.filter((u) =>
+    isPersonDueToday(
+      u.reportCadence,
+      (u.reportDueDays as number[]) ?? [5],
+      u.reportBiweeklyWeek,
+      targetDateStart,
+      biweeklyStartDate
+    )
+  );
+  const notExpectedUsers = activeUsers.filter((u) =>
+    !isPersonDueToday(
+      u.reportCadence,
+      (u.reportDueDays as number[]) ?? [5],
+      u.reportBiweeklyWeek,
+      targetDateStart,
+      biweeklyStartDate
+    )
+  );
+
+  const userIds = expectedUsers.map((u) => u.id);
 
   // Fetch department ordering for the summary
   const deptOrder = departmentOrdering === "manual"
@@ -96,9 +121,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
       })
     : [];
 
-  // Find reports for the target day.
-  // Primary: explicit reportDate set (new behavior + manually fixed reports).
-  // Fallback: reportDate is null — use submittedAt (covers reports uploaded before feature was deployed).
+  // Find reports for the target day — expected users only
   const matchingReportIds = await prisma.report.findMany({
     where: {
       userId: { in: userIds },
@@ -128,6 +151,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
   const todayByUser = new Map(todayReports.map((r) => [r.userId, r]));
   const narrativeByUser = new Map(narratives.map((n) => [n.userId, n]));
+  // Stand-ins only for expected users who didn't submit today
   const missingIds = userIds.filter((id) => !todayByUser.has(id));
 
   const thirtyDaysAgo = new Date(targetDateStart);
@@ -147,7 +171,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
   let freshCount = 0;
   const standInSummaries: { name: string; daysSince: number }[] = [];
 
-  for (const u of activeUsers) {
+  for (const u of expectedUsers) {
     if (todayByUser.has(u.id)) {
       freshCount++;
     } else {
@@ -160,13 +184,32 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
   }
 
   const completenessScore: CompletenessScore = {
-    totalExpected: activeUsers.length,
+    totalExpected: expectedUsers.length,
     freshToday: freshCount,
     standIns: standInSummaries,
-    percentage: Math.round((freshCount / activeUsers.length) * 100),
+    percentage: expectedUsers.length > 0 ? Math.round((freshCount / expectedUsers.length) * 100) : 100,
+    notScheduledToday: notExpectedUsers.map((u) => ({ name: u.name })),
   };
 
-  const people = activeUsers.map((u) => {
+  // Departments where ZERO expected members exist → show as placeholder in report
+  const expectedDeptNames = new Set(
+    expectedUsers.map((u) => u.departmentMemberships[0]?.department?.name).filter(Boolean)
+  );
+  const notExpectedDeptSchedules = new Map<string, Set<string>>();
+  for (const u of notExpectedUsers) {
+    const deptName = u.departmentMemberships[0]?.department?.name;
+    if (!deptName || expectedDeptNames.has(deptName)) continue;
+    if (!notExpectedDeptSchedules.has(deptName)) notExpectedDeptSchedules.set(deptName, new Set());
+    notExpectedDeptSchedules.get(deptName)!.add(
+      buildScheduleLabel(u.reportCadence, (u.reportDueDays as number[]) ?? [5])
+    );
+  }
+  const notExpectedDepartments = Array.from(notExpectedDeptSchedules.entries()).map(([name, labels]) => ({
+    name,
+    scheduleLabel: Array.from(labels).join("; "),
+  }));
+
+  const people = expectedUsers.map((u) => {
     const narrative = narrativeByUser.get(u.id);
     const todayReport = todayByUser.get(u.id);
     const standIn = standInByUser.get(u.id);
@@ -224,7 +267,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
   // Build reportLinks map: personName → parsedReportId + date + isStandIn
   // Used by the email renderer to add "View Report" links next to each person's name.
   const reportLinks: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }> = {};
-  for (const u of activeUsers) {
+  for (const u of expectedUsers) {
     const todayReport = todayByUser.get(u.id);
     const standIn = standInByUser.get(u.id);
     const activeReport = todayReport ?? standIn;
@@ -250,6 +293,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     departmentOrdering,
     departmentOrder: deptOrder.map((d) => d.name),
     reportingWindowStart,
+    notExpectedDepartments,
   });
 
   // Always create a new record so regeneration produces a distinct timestamped entry
@@ -259,7 +303,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
       summaryDate: targetDateStart,
       aiFullSummary: summaryText,
       totalSubmissions: freshCount,
-      missingSubmissions: activeUsers.length - freshCount,
+      missingSubmissions: expectedUsers.length - freshCount,
       alertCount: recentAlerts.length,
     },
   });
