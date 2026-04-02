@@ -143,12 +143,13 @@ export async function callClaude(
   prompt: string,
   userMessage: string,
   model: "claude-sonnet-4-20250514" | "claude-haiku-4-5-20251001" = "claude-sonnet-4-20250514",
-  apiKey?: string | null
+  apiKey?: string | null,
+  maxTokens: number = 4096
 ): Promise<string> {
   const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
   const message = await client.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     system: prompt,
     messages: [{ role: "user", content: userMessage }],
   });
@@ -505,5 +506,5 @@ export async function generateExecutiveSummaryV2(context: {
 }): Promise<string> {
   const { apiKey, ...rest } = context;
   const prompt = loadPrompt("executive-summary-v2.txt");
-  return callClaude(prompt, JSON.stringify(rest), "claude-sonnet-4-20250514", apiKey);
+  return callClaude(prompt, JSON.stringify(rest), "claude-sonnet-4-20250514", apiKey, 8192);
 }
