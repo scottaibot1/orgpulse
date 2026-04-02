@@ -29,7 +29,7 @@ export async function sendSummaryEmail({
   missingSubmissions: number;
   markdown: string;
   appUrl: string;
-  reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean }>;
+  reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }>;
 }) {
   const pdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print`;
   const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl, appUrl, reportLinks };

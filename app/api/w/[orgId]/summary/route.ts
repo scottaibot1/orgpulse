@@ -114,7 +114,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     matchingReportIds.length > 0
       ? prisma.parsedReport.findMany({
           where: { reportId: { in: matchingReportIds } },
-          select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
+          select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true, report: { select: { rawPdfUrl: true } } },
         })
       : Promise.resolve([]),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
@@ -138,7 +138,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         where: { userId: { in: missingIds }, date: { lt: targetDateStart, gte: thirtyDaysAgo } },
         orderBy: { date: "desc" },
         distinct: ["userId"],
-        select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
+        select: { id: true, userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true, report: { select: { rawPdfUrl: true } } },
       })
     : [];
 
@@ -223,7 +223,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
   // Build reportLinks map: personName → parsedReportId + date + isStandIn
   // Used by the email renderer to add "View Report" links next to each person's name.
-  const reportLinks: Record<string, { parsedReportId: string; date: string; isStandIn: boolean }> = {};
+  const reportLinks: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }> = {};
   for (const u of activeUsers) {
     const todayReport = todayByUser.get(u.id);
     const standIn = standInByUser.get(u.id);
@@ -234,6 +234,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         parsedReportId: activeReport.id,
         date: new Date(activeReport.date).toISOString().split("T")[0],
         isStandIn,
+        fileUrl: (activeReport as { report?: { rawPdfUrl?: string | null } }).report?.rawPdfUrl ?? null,
       };
     }
   }

@@ -71,7 +71,7 @@ export interface RenderContext {
   createdAt: Date;
   pdfUrl?: string;
   appUrl?: string;
-  reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean }>;
+  reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }>;
 }
 
 export function parseAiSummary(text: string): AiSummaryData | null {
@@ -217,22 +217,30 @@ function pdfTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
 
 function emailTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
   if (!alloc || !alloc.length) return "";
+  const safe = alloc.filter(Boolean);
+  const totalHours = safe.reduce((s, t) => s + (t.hours ?? 0), 0);
+  const totalHoursStr = Number.isInteger(totalHours) ? `${totalHours}h` : `${totalHours.toFixed(1)}h`;
   const sectionLabel = estimated ? "Estimated Time Spent" : "Time Allocation";
-  const rows = alloc.filter(Boolean).map((t, i) => {
+  const rows = safe.map((t, i) => {
     const color = BAR_COLORS[i % BAR_COLORS.length];
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
     const restPct = 100 - barPct;
+    // Use width HTML attributes (not just CSS) so Outlook Word engine respects them.
+    // Label column is 120px wide so most task names fit; hours column is fixed at 36px.
     return `<tr><td style="padding:2px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
-      <td style="width:80px;font-size:10px;color:#64748b;padding-right:6px;vertical-align:middle;white-space:nowrap;">${t.label}</td>
-      <td style="vertical-align:middle;padding:0 4px;"><table cellpadding="0" cellspacing="0" width="100%" style="border-radius:3px;overflow:hidden;"><tr>
+      <td width="120" valign="top" style="font-size:10px;color:#64748b;padding-right:6px;padding-top:1px;">${t.label}</td>
+      <td valign="middle" style="padding:3px 4px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
         <td width="${barPct}%" height="6" bgcolor="${color}" style="background:${color};font-size:0;line-height:0;">&#8203;</td>
         ${restPct > 0 ? `<td width="${restPct}%" height="6" bgcolor="#f1f5f9" style="background:#f1f5f9;font-size:0;line-height:0;">&#8203;</td>` : ""}
       </tr></table></td>
-      <td style="width:30px;font-size:10px;color:#64748b;padding-left:4px;text-align:right;vertical-align:middle;white-space:nowrap;">${t.hours}h</td>
+      <td width="36" valign="top" style="font-size:10px;color:#64748b;padding-left:4px;text-align:right;padding-top:1px;">${t.hours}h</td>
     </tr></table></td></tr>`;
   }).join("");
   return `<tr><td style="padding:6px 12px 10px;border-top:1px dashed #e2e8f0;">
-    <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">${sectionLabel}</div>
+    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:5px;"><tr>
+      <td style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;">${sectionLabel}</td>
+      <td style="text-align:right;font-size:10px;font-weight:700;color:#64748b;">${totalHoursStr} total</td>
+    </tr></table>
     <table cellpadding="0" cellspacing="0" width="100%">${rows}</table>
   </td></tr>`;
 }
@@ -435,12 +443,17 @@ function emailStatusBadge(p: PersonData): string {
 function makeEmailPersonRow(ctx: RenderContext) {
   return function emailPersonRow(p: PersonData): string {
     const reportLink = ctx.reportLinks?.[p.name];
-    const viewReportLink = reportLink && ctx.appUrl
+    const viewReportLink = reportLink
       ? (() => {
-          const label = reportLink.isStandIn
-            ? `View Report (stand-in, ${reportLink.date})`
-            : "View Report";
-          return `<a href="${ctx.appUrl}/report/${reportLink.parsedReportId}" style="display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">${label} →</a>`;
+          // Prefer the raw uploaded file (PDF/Excel/PPT); fall back to the parsed report viewer
+          const href = reportLink.fileUrl
+            ? reportLink.fileUrl
+            : ctx.appUrl
+              ? `${ctx.appUrl}/report/${reportLink.parsedReportId}`
+              : null;
+          if (!href) return "";
+          const label = reportLink.isStandIn ? `View Report (${reportLink.date})` : "View Report";
+          return `<a href="${href}" style="display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">${label} →</a>`;
         })()
       : "";
     return `
