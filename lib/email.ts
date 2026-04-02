@@ -36,14 +36,16 @@ export async function sendSummaryEmail({
 
   // Try new structured JSON format first; fall back to legacy markdown for old records
   const parsed = parseAiSummary(markdown);
-  console.log(`[Email] parseAiSummary result: ${parsed ? "structured JSON ok" : "null — will use legacy markdown"}`);
+  console.log(`[Email] parseAiSummary result: ${parsed ? "structured JSON ok" : "null — fallback"}`);
+  if (!parsed) console.log(`[Email] raw markdown prefix (200 chars): ${markdown.slice(0, 200)}`);
   let html = "";
   let useLegacy = !parsed;
   if (parsed) {
     try {
       html = renderEmailHtml(parsed, ctx);
     } catch (renderErr) {
-      console.error("[Email] renderEmailHtml threw — falling back to markdown:", renderErr);
+      const msg = renderErr instanceof Error ? `${renderErr.message}\n${renderErr.stack}` : String(renderErr);
+      console.error("[Email] renderEmailHtml threw:", msg);
       useLegacy = true;
     }
   }

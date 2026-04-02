@@ -75,12 +75,24 @@ export interface RenderContext {
 }
 
 export function parseAiSummary(text: string): AiSummaryData | null {
-  const cleaned = text
+  // Strip code fences
+  let cleaned = text
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/```\s*$/i, "")
     .trim();
-  if (!cleaned.startsWith("{")) return null;
+
+  // If there's prefixed text before the JSON, find the first {
+  if (!cleaned.startsWith("{")) {
+    const idx = cleaned.indexOf("{");
+    if (idx === -1) return null;
+    cleaned = cleaned.slice(idx);
+  }
+
+  // Trim any trailing text after the closing }
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (lastBrace !== -1) cleaned = cleaned.slice(0, lastBrace + 1);
+
   try {
     return JSON.parse(cleaned) as AiSummaryData;
   } catch {
@@ -120,7 +132,7 @@ const HIGHLIGHT_MAP: Record<string, HighlightStyle> = {
 };
 
 function personInitial(name: string) {
-  return name.trim().charAt(0).toUpperCase();
+  return (name ?? "?").trim().charAt(0).toUpperCase();
 }
 
 // ─── Category-grouped highlights ─────────────────────────────────────────────
@@ -128,11 +140,12 @@ function personInitial(name: string) {
 // Group highlights by type, inject a category label row before each new group
 function groupedHighlightsPdf(highlights: HighlightItem[]): string {
   if (!highlights || !highlights.length) return "";
-  const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
+  const safe = highlights.filter(Boolean);
+  const distinctTypes = Array.from(new Set(safe.map((h) => h.type)));
   const showLabels = distinctTypes.length > 1;
   let out = "";
   let lastType = "";
-  for (const h of highlights) {
+  for (const h of safe) {
     const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
     if (showLabels && h.type !== lastType) {
       out += `<div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;margin:8px 0 4px;">${s.categoryLabel.toUpperCase()}</div>`;
@@ -148,11 +161,12 @@ function groupedHighlightsPdf(highlights: HighlightItem[]): string {
 
 function groupedHighlightsEmail(highlights: HighlightItem[]): string {
   if (!highlights || !highlights.length) return "";
-  const distinctTypes = Array.from(new Set(highlights.map((h) => h.type)));
+  const safe = highlights.filter(Boolean);
+  const distinctTypes = Array.from(new Set(safe.map((h) => h.type)));
   const showLabels = distinctTypes.length > 1;
   let out = "";
   let lastType = "";
-  for (const h of highlights) {
+  for (const h of safe) {
     const s = HIGHLIGHT_MAP[h.type] ?? HIGHLIGHT_MAP.ontack;
     if (showLabels && h.type !== lastType) {
       out += `<tr><td style="padding:7px 0 3px;font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.1em;">${s.categoryLabel.toUpperCase()}</td></tr>`;
@@ -181,7 +195,7 @@ function pdfStatusBadge(p: PersonData): string {
 function pdfTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
   if (!alloc || !alloc.length) return "";
   const sectionLabel = estimated ? "(Estimated Time Spent)" : "Time Allocation";
-  const rows = alloc
+  const rows = alloc.filter(Boolean)
     .map(
       (t, i) => `
       <div style="margin-bottom:6px;">
@@ -204,7 +218,7 @@ function pdfTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
 function emailTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
   if (!alloc || !alloc.length) return "";
   const sectionLabel = estimated ? "Estimated Time Spent" : "Time Allocation";
-  const rows = alloc.map((t, i) => {
+  const rows = alloc.filter(Boolean).map((t, i) => {
     const color = BAR_COLORS[i % BAR_COLORS.length];
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
     const restPct = 100 - barPct;
