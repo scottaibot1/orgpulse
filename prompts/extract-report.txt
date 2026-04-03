@@ -8,7 +8,11 @@ Never split one row into multiple task entries. Never merge separate rows just b
 
 READING ACTIVITY LOGS AND BULLET LISTS: When a person lists time blocks or bullet points of what they worked on, each distinct item is one task. Preserve every hour count, call count, email count, meeting count, client name, project name, and measurable outcome exactly as written. A sentence that says "made 15 calls to travel advisers" must produce a task that says "15 calls to travel advisers" — not "made calls."
 
-REASONING ABOUT STATUS AND PRIORITY: After reading every record, apply intelligent prioritization:
+READING FREE-FORM NARRATIVE TEXT: Apply the same intelligent reasoning to unstructured prose as you do to tables. When someone writes casually about their day, read the intent and meaning behind their words — not just the literal surface. A person who writes "this task is challenging" is signaling difficulty — classify it as at-risk or a blocker. "Waiting to hear back" is a blocker. "Will try again tomorrow" means something did not happen today. "Not sure how to proceed" is a request for guidance. "Had trouble reaching" is a dependency risk. "Rescheduled" means a planned action was deferred. "Almost done" implies high completion. "Just started" implies low completion. Repeated mentions of the same task with no change signals stalling.
+
+Read the emotional register and intent of every sentence. If someone sounds stuck, treat them as stuck. If something sounds urgent, treat it as urgent. A smart analyst would catch all of these signals — so must you.
+
+REASONING ABOUT STATUS AND PRIORITY: After reading every record — structured or free-form — apply intelligent prioritization:
 - A task whose due date has already passed and is not complete is overdue — set status "at_risk" and note it was overdue with the original date
 - A task with a near future due date and low completion is a risk — set status "at_risk"
 - A task explicitly marked complete or at 100% is complete — set status "complete" regardless of what section it appears in
