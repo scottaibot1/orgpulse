@@ -37,7 +37,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true, lastReportGeneratedAt: true, biweeklyStartDate: true } } },
+    select: { name: true, ownerEmail: true, workspaceSettings: { select: { reportCollectionScope: true, anthropicApiKey: true, reportDetailLevel: true, departmentOrdering: true, lastReportGeneratedAt: true, biweeklyStartDate: true, reportTheme: true } } },
   });
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -54,6 +54,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
   const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
   const reportDetailLevel = org.workspaceSettings?.reportDetailLevel ?? 3;
   const departmentOrdering = org.workspaceSettings?.departmentOrdering ?? "manual";
+  const reportTheme = (org.workspaceSettings?.reportTheme ?? "dark") as "dark" | "light";
 
   // reportingWindowStart = selected day (only reports from that day qualify for Notable Progress)
   const reportingWindowStart = targetDate;
@@ -375,6 +376,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         missingSubmissions: saved.missingSubmissions,
         markdown: saved.aiFullSummary!,
         appUrl,
+        theme: reportTheme,
       });
       emailSent = true;
       console.log(`[Summary] Email sent to ${org.ownerEmail} for org ${org.name} (${orgId})`);

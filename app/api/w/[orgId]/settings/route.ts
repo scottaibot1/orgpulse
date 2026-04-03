@@ -21,6 +21,7 @@ const updateSchema = z.object({
   autoReportDetailLevel: z.number().int().min(1).max(5).optional(),
   departmentOrdering: z.enum(["manual", "ai_determined"]).optional(),
   biweeklyStartDate: z.string().nullable().optional(),
+  reportTheme: z.enum(["dark", "light"]).optional(),
 });
 
 interface Params { params: Promise<{ orgId: string }> }
@@ -52,7 +53,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Invalid input", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { name, description, accentColor, cronSchedule, cronTimezone, reportCadence, aiParameters, submissionMethods, reportCollectionScope, anthropicApiKey, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate } = parsed.data;
+  const { name, description, accentColor, cronSchedule, cronTimezone, reportCadence, aiParameters, submissionMethods, reportCollectionScope, anthropicApiKey, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate, reportTheme } = parsed.data;
 
   if (name) {
     await prisma.organization.update({ where: { id: orgId }, data: { name } });
@@ -72,6 +73,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (autoReportDetailLevel !== undefined) settingsData.autoReportDetailLevel = autoReportDetailLevel;
   if (departmentOrdering !== undefined) settingsData.departmentOrdering = departmentOrdering;
   if (biweeklyStartDate !== undefined) settingsData.biweeklyStartDate = biweeklyStartDate ? new Date(biweeklyStartDate) : null;
+  if (reportTheme !== undefined) settingsData.reportTheme = reportTheme;
 
   if (Object.keys(settingsData).length > 0) {
     await prisma.workspaceSettings.upsert({

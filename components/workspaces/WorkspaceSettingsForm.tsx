@@ -102,6 +102,7 @@ interface WorkspaceData {
     reportDetailLevel?: number;
     departmentOrdering?: string;
     biweeklyStartDate?: string | null;
+    reportTheme?: string | null;
   } | null;
 }
 
@@ -137,6 +138,7 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
   const [reportDetailLevel, setReportDetailLevel] = useState(settings?.reportDetailLevel ?? 3);
   const [autoReportDetailLevel, setAutoReportDetailLevel] = useState((settings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? 3);
   const [departmentOrdering, setDepartmentOrdering] = useState(settings?.departmentOrdering ?? "manual");
+  const [reportTheme, setReportTheme] = useState<"dark" | "light">((settings?.reportTheme as "dark" | "light") ?? "dark");
   const [biweeklyStartDate, setBiweeklyStartDate] = useState(
     settings?.biweeklyStartDate ? new Date(settings.biweeklyStartDate).toISOString().split("T")[0] : ""
   );
@@ -192,7 +194,7 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
     const res = await fetch(`/api/w/${orgId}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, cronSchedule, cronTimezone, submissionMethods, reportCollectionScope, anthropicApiKey: anthropicApiKey || null, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate: biweeklyStartDate || null }),
+      body: JSON.stringify({ ...form, cronSchedule, cronTimezone, submissionMethods, reportCollectionScope, anthropicApiKey: anthropicApiKey || null, reportDetailLevel, autoReportDetailLevel, departmentOrdering, biweeklyStartDate: biweeklyStartDate || null, reportTheme }),
     });
 
     if (!res.ok) {
@@ -527,6 +529,40 @@ export default function WorkspaceSettingsForm({ workspace, orgId }: Props) {
           {autoReportDetailLevel === 3 && "Antonio logged 6 hrs. Henderson Proposal 60% complete, on track. Client calls with Meridian completed."}
           {autoReportDetailLevel === 4 && "Antonio: 6.5 hrs total. Henderson Proposal 60% (3 hrs), Meridian calls 2 hrs, Admin 1.5 hrs. Proposal deadline March 28 — 3 days out."}
           {autoReportDetailLevel === 5 && "Antonio Reyes submitted at 4:47 PM. Total reported hours: 6.5. Henderson Proposal at 60% — deadline March 28. Flagged: awaiting legal approval may cause delay."}
+        </div>
+      </div>
+
+      {/* Report Color Theme */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Report Color Theme</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Dark mode is the default. Light mode coming soon.</p>
+        </div>
+        <div className="flex gap-3">
+          {(["dark", "light"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setReportTheme(t)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
+                reportTheme === t
+                  ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <span>{t === "dark" ? "🌙" : "☀️"}</span>
+              <span className="capitalize">{t}</span>
+              {reportTheme === t && <span className="ml-1 bg-violet-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">✓</span>}
+            </button>
+          ))}
+        </div>
+        <div className={`rounded-xl overflow-hidden border ${reportTheme === "dark" ? "border-slate-700" : "border-slate-200"}`}
+          style={{ background: reportTheme === "dark" ? "#0f172a" : "#ffffff", padding: "12px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: reportTheme === "dark" ? "#64748b" : "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>⚡ Report preview</div>
+          <div style={{ background: reportTheme === "dark" ? "#1e293b" : "#f8fafc", borderRadius: 8, padding: "10px 14px", border: `0.5px solid ${reportTheme === "dark" ? "rgba(255,255,255,0.08)" : "#e2e8f0"}` }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: reportTheme === "dark" ? "#f1f5f9" : "#0f172a", marginBottom: 4 }}>Sarah Johnson</div>
+            <div style={{ fontSize: 11, color: reportTheme === "dark" ? "#64748b" : "#94a3b8" }}>6h logged · <span style={{ background: reportTheme === "dark" ? "#14532d" : "#dcfce7", color: reportTheme === "dark" ? "#86efac" : "#15803d", borderRadius: 10, padding: "1px 8px", fontSize: 10 }}>Today</span></div>
+          </div>
         </div>
       </div>
 

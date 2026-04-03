@@ -47,6 +47,7 @@ model WorkspaceSettings {
   reportDetailLevel     Int      @default(3) @map("report_detail_level")
   autoReportDetailLevel Int      @default(3) @map("auto_report_detail_level")
   departmentOrdering    String   @default("manual") @map("department_ordering")
+  reportTheme             String    @default("dark") @map("report_theme")
   biweeklyStartDate       DateTime? @map("biweekly_start_date")
   lastReportGeneratedAt   DateTime? @map("last_report_generated_at")
   createdAt               DateTime  @default(now()) @map("created_at")

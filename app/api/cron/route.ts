@@ -65,6 +65,7 @@ async function runCronWork(): Promise<void> {
       const autoReportDetailLevel = (org.workspaceSettings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? (org.workspaceSettings as { reportDetailLevel?: number } | null)?.reportDetailLevel ?? 3;
       const departmentOrdering = (org.workspaceSettings as { departmentOrdering?: string } | null)?.departmentOrdering ?? "manual";
       const biweeklyStartDate = (org.workspaceSettings as { biweeklyStartDate?: Date | null } | null)?.biweeklyStartDate ?? null;
+      const reportTheme = ((org.workspaceSettings as { reportTheme?: string } | null)?.reportTheme ?? "dark") as "dark" | "light";
       const lastGeneratedAt = (org.workspaceSettings as { lastReportGeneratedAt?: Date | null } | null)?.lastReportGeneratedAt ?? null;
       const reportingWindowStart = lastGeneratedAt ? lastGeneratedAt.toISOString().split("T")[0] : null;
 
@@ -347,6 +348,7 @@ async function runCronWork(): Promise<void> {
           missingSubmissions: dueTodayUsers.length - freshCount,
           markdown: summaryText,
           appUrl,
+          theme: reportTheme,
         }).then(() => {
           console.log(`[Cron] ${org.name}: Email sent to ${org.ownerEmail}`);
         }).catch((e) => console.error(`[Cron] ${org.name}: Email failed for ${org.ownerEmail}:`, e));

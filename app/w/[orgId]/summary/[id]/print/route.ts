@@ -20,18 +20,20 @@ export async function GET(_req: NextRequest, { params }: Params) {
       where: { id, orgId },
       select: { aiFullSummary: true, summaryDate: true, totalSubmissions: true, missingSubmissions: true, createdAt: true },
     }),
-    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
+    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, workspaceSettings: { select: { reportTheme: true } } } }),
   ]);
 
   if (!summary?.aiFullSummary) return new NextResponse("Not found", { status: 404 });
 
   const orgName = org?.name ?? "Organization";
+  const reportTheme = (org?.workspaceSettings?.reportTheme ?? "dark") as "dark" | "light";
   const ctx = {
     orgName,
     summaryDate: new Date(summary.summaryDate),
     totalSubmissions: summary.totalSubmissions,
     missingSubmissions: summary.missingSubmissions,
     createdAt: new Date(summary.createdAt),
+    theme: reportTheme,
   };
 
   // Try new structured JSON format; fall back to legacy markdown for old records

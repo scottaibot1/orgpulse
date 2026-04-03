@@ -18,6 +18,7 @@ export async function sendSummaryEmail({
   missingSubmissions,
   markdown,
   appUrl,
+  theme,
   reportLinks,
 }: {
   toEmail: string;
@@ -29,10 +30,11 @@ export async function sendSummaryEmail({
   missingSubmissions: number;
   markdown: string;
   appUrl: string;
+  theme?: "dark" | "light";
   reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }>;
 }) {
   const pdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print`;
-  const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl, appUrl, reportLinks };
+  const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl, appUrl, theme, reportLinks };
 
   // Try new structured JSON format first; fall back to legacy markdown for old records
   const parsed = parseAiSummary(markdown);
