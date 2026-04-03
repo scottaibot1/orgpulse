@@ -230,12 +230,23 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         summary?: string;
         tasks?: {
           description: string;
+          classification?: string;
+          daysOverdue?: number | null;
+          subcategory?: string | null;
           status: string;
           hoursToday?: number | null;
           projectName?: string | null;
           pctComplete?: number | null;
           dueDate?: string | null;
         }[];
+        salesPipeline?: {
+          new_leads_today?: number | null;
+          leads_contacted?: number | null;
+          hot_responsive?: number | null;
+          qualified?: number | null;
+          hot_but_cold?: number | null;
+          proposals_sent?: number | null;
+        } | null;
         notes?: string | null;
         blockers?: string | null;
         totalHours?: number | null;
@@ -243,18 +254,28 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
       if (sd.tasks && sd.tasks.length > 0) {
         const taskLines = sd.tasks.map((t) => {
+          const cls = t.classification ?? t.status;
+          const overdue = t.daysOverdue ? ` ${t.daysOverdue}d OVERDUE` : "";
           const hrs = t.hoursToday != null ? ` [${t.hoursToday}h]` : "";
           const proj = t.projectName ? ` — ${t.projectName}` : "";
           const due = t.dueDate ? ` · due ${t.dueDate}` : "";
           const pct = t.pctComplete != null ? ` · ${t.pctComplete}%` : "";
-          return `• ${t.description}${proj}${hrs} (${t.status})${due}${pct}`;
+          const sub = t.subcategory ? ` [${t.subcategory}]` : "";
+          return `• [${cls.toUpperCase()}${overdue}]${sub} ${t.description}${proj}${hrs}${due}${pct}`;
         }).join("\n");
+
+        const pipelineSection = sd.salesPipeline ? [
+          "",
+          "Sales Pipeline:",
+          `  New Today: ${sd.salesPipeline.new_leads_today ?? "–"} · Contacted: ${sd.salesPipeline.leads_contacted ?? "–"} · Hot/Responsive: ${sd.salesPipeline.hot_responsive ?? "–"} · Qualified: ${sd.salesPipeline.qualified ?? "–"} · Hot but Cold: ${sd.salesPipeline.hot_but_cold ?? "–"} · Proposals: ${sd.salesPipeline.proposals_sent ?? "–"}`,
+        ].join("\n") : "";
 
         builtNarrative = [
           sd.summary ?? activeReport.aiSummary ?? "",
           "",
           "Tasks:",
           taskLines,
+          pipelineSection,
           sd.notes ? `\nNotes: ${sd.notes}` : "",
           sd.blockers ? `\nBlockers: ${sd.blockers}` : "",
           sd.totalHours != null ? `\nTotal hours: ${sd.totalHours}` : "",

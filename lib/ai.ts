@@ -12,44 +12,126 @@ function loadPrompt(filename: string): string {
   return fs.readFileSync(promptPath, "utf-8");
 }
 
-// ─── Vision parsing instruction (sent as text block with page images) ────────
+// ─── Vision parsing instruction — built dynamically with today's date ─────────
 
-const VISION_PARSING_INSTRUCTION = `You are an expert analyst reading a work report you have never seen before from a company you know nothing about. You are looking at the actual pages of this document as images. Read every page completely before extracting anything.
+function buildVisionInstruction(todayIso: string): string {
+  return `Today's date is ${todayIso}. Use this exact date for all overdue calculations. Never use any other date as today.
 
-Your job is to understand the structure of every table, list, and narrative section from context alone and extract everything that is meaningful about each person's work. You do not need column headers to be in English or to match any expected format. You do not need status fields to use specific words. You use reasoning to determine what every piece of information means based on its context, position, and content — exactly the way a smart human reader would.
+You are an expert analyst reading a work report you have never seen before. Read every page completely before extracting anything. Your job is to extract every task and classify it into exactly one of six buckets. A task must appear in exactly one bucket — never two.
 
-READING TABLES: For every table you encounter, read it as a complete structured dataset. Every row is one record — one project or task. Every column belongs to that record. Understand what each column represents from its header and the data it contains without needing specific words. A column with future dates is likely a due date or delivery target. A column with percentages is likely completion progress. A column with words indicating completion in any language — done, finished, complete, terminado, cerrado, concluido, 100% — means that task is finished. A column with words indicating active work in any language — in progress, proceso, en curso, ongoing, active — means the task is underway. A column showing 0% or words like not started, no empezado, sin iniciar means the task has not begun. A column with observations, notes, or comments is a running log for that row — keep all of its content together with its row. Never split one row into multiple records. Never merge separate rows just because they share a theme.
+━━━ CLASSIFICATION RULES — apply before any output ━━━
 
-READING ACTIVITY LOGS: When a person lists time blocks showing what they did throughout a day, each time block is one activity. Extract start time, end time, duration, and the full description of everything in that block as one consolidated entry. Sum all durations for total hours. Build a time allocation breakdown from the actual activity descriptions.
+Assign "classification" to every project/task using exactly one of these values:
 
-READING FREE-FORM NARRATIVE TEXT: Apply the same intelligent reasoning to unstructured prose as you do to tables. When someone writes casually about their day, read the intent and meaning behind their words — not just the literal surface. A person who writes "this task is challenging" is signaling difficulty and likely needs help — classify it as at-risk or a blocker depending on context. "Waiting to hear back" is a blocker. "Will try again tomorrow" means something did not happen today and progress stalled. "Not sure how to proceed" is a request for guidance. "Had trouble reaching" is a dependency risk. "Rescheduled" means a planned action was deferred. "Almost done" or "nearly finished" implies high completion. "Just started" or "kicked off" implies low completion. "Still working on it" across multiple updates with no change signals stalling.
+"completed" — Status says done, finished, complete, terminado, completado, finalizado, concluido in any language. OR percentageComplete is 100. Completed always wins over any due date. A completed task is NEVER overdue.
 
-Read the emotional register and intent of every sentence. If someone sounds stuck, treat them as stuck. If something sounds urgent, treat it as urgent. If something has been mentioned repeatedly with no progress, surface it. An analyst reading this report would notice all of these signals — you must too.
+"overdue" — Incomplete AND estimatedDelivery is before ${todayIso}. Calculate daysOverdue as exact calendar days between estimatedDelivery and today. Must be a positive integer.
 
-REASONING ABOUT PRIORITY AND STATUS: After understanding every record — whether from a structured table or free-form prose — apply intelligent prioritization. A task whose due date has already passed and is not complete is a problem; surface it prominently with its original due date. A task with a near future due date and low completion is a risk. A task explicitly marked complete or at 100% belongs in completed regardless of where it appears in the document. Anything the person says they plan to do tomorrow or next is their stated next actions. Any task where the language signals difficulty, blockage, or stalling belongs in a more urgent category than on-track. Never leave a task in a vague unclassified state when the document gives enough context to classify it more specifically.
+"at_risk" — Incomplete AND estimatedDelivery is within 7 days of ${todayIso}. OR text explicitly flags as problem, at-risk, en riesgo, atrasado, challenging, behind, retrasado — even with no due date.
 
-PRESERVE EVERYTHING: Extract every specific data point without exception — all hours, all counts of calls emails meetings or activities, all named projects clients accounts tasks, all specific dates deadlines and dollar amounts, all observations and blocker notes exactly as written. Do not paraphrase, summarize, or discard any specific detail. If a number or name appears in the document it must appear in the output.
+"in_progress" — Actively being worked. Due date more than 7 days away or no due date. Status is on track, en proceso, ongoing, active, in progress, no empezado (if not yet due).
 
-OUTPUT FORMAT: Return ONLY a valid JSON object. The first character must be { and the last must be }. Use these exact top-level fields:
+"blocked" — Explicitly waiting on someone or something. Language: waiting for, en espera, bloqueado, pending approval, can't proceed until, need response from, on hold. Both internal and external waits.
+
+"tomorrow" — Listed under tomorrow's objectives, plans for tomorrow, mañana, próximos pasos, next steps. These are plans, not current work.
+
+DETECTION SIGNALS:
+- "Waiting to hear back" → blocked
+- "Almost done" / "nearly finished" → in_progress with high pctComplete
+- "Not sure how to proceed" → blocked
+- 0% complete AND due date before ${todayIso} → overdue
+- ≤15% complete AND due within 14 days → at_risk
+- Task mentioned repeatedly with no visible progress → note stall in observationsAndBlockers
+
+━━━ SALES PIPELINE DETECTION ━━━
+
+Before classifying tasks, check if this report contains a sales pipeline (leads, hot leads, qualified leads, proposals, conversion metrics, pipeline counts, CRM data, sales activity counts). If present, extract exactly these six numbers — use only numbers explicitly stated in the document, not estimates:
+- new_leads_today: leads added or received today
+- leads_contacted: leads reached out to today
+- hot_responsive: leads actively responding or showing strong interest
+- qualified: leads that have been qualified or moved to a qualified stage
+- hot_but_cold: leads that were hot but have gone silent or unresponsive
+- proposals_sent: proposals or quotes sent today
+
+Set salesPipeline to null if no sales pipeline data exists in this document.
+
+━━━ READING TABLES ━━━
+
+Every row is one record. Never split rows. Never merge rows. Understand columns from context:
+- Future dates → estimatedDelivery
+- Percentages → percentageComplete
+- Completion words (terminado, done, 100%) → completed
+- Active words (proceso, ongoing) → in_progress
+- Observations/notes/comments → observationsAndBlockers
+- lastModified → use internally for staleness detection, do not display
+
+━━━ READING ACTIVITY LOGS AND PROSE ━━━
+
+Activity logs: each time block is one activity with start, end, duration, description. Sum durations for total hours.
+Prose: read intent. "Challenging" → at_risk. "Waiting" → blocked. "Rescheduled" → deferred.
+
+━━━ SUBCATEGORY GROUPING ━━━
+
+For operations, facilities, property management, or any role with 8+ tasks: assign a subcategory group name. Examples: "Guest Experience", "Facilities & Maintenance", "Food & Beverage", "Staff & HR", "Administrative", "Vendor Relations". For other roles with fewer tasks, subcategory may be empty string.
+
+━━━ PRESERVE EVERYTHING ━━━
+
+Extract every data point without exception — all hours, counts, named projects, clients, accounts, specific dates, dollar amounts, observations, and blocker notes exactly as written.
+
+OUTPUT FORMAT: Return ONLY valid JSON. First character { last character }.
 {
-  "personName": string or "" if not found,
-  "reportDate": "YYYY-MM-DD for the date the work was performed — search the entire document for any date reference in the header, title, subject line, or body. This is the date the work happened, not today's date. Return empty string only if truly no date exists anywhere in the document.",
-  "department": string or "" if not found,
+  "personName": string or "",
+  "reportDate": "YYYY-MM-DD of the work performed — search entire document. Empty string if truly none.",
+  "department": string or "",
+  "salesPipeline": { "new_leads_today": number or null, "leads_contacted": number or null, "hot_responsive": number or null, "qualified": number or null, "hot_but_cold": number or null, "proposals_sent": number or null } or null,
   "plannedObjectives": [{ "objective": string, "completionNote": string }],
   "activities": [{ "startTime": string, "endTime": string, "durationHours": number, "description": string }],
-  "totalHoursWorked": number or 0 if not found,
+  "totalHoursWorked": number or 0,
   "timeAllocation": [{ "taskName": string, "hours": number, "percentage": number }],
-  "projects": [{ "projectName": string, "startDate": string, "estimatedDelivery": "YYYY-MM-DD if any column represents a target, due, or delivery date — reason from context, not column name", "lastModified": string, "status": "the raw status text exactly as it appears in the document — do not translate or normalize", "percentageComplete": number, "observationsAndBlockers": string }],
+  "projects": [
+    {
+      "projectName": string,
+      "startDate": string,
+      "estimatedDelivery": "YYYY-MM-DD or empty string",
+      "lastModified": string,
+      "status": "raw status text exactly as in document",
+      "percentageComplete": number,
+      "observationsAndBlockers": string,
+      "classification": "completed" | "overdue" | "at_risk" | "in_progress" | "blocked" | "tomorrow",
+      "daysOverdue": positive integer if overdue, null otherwise,
+      "subcategory": string or ""
+    }
+  ],
   "risksAndEscalations": [string],
   "executiveSummary": string
-}`;
+}
+
+CRITICAL RULES:
+1. Every project has exactly one classification — never two.
+2. daysOverdue is a positive integer for "overdue" items — never null when classification is "overdue".
+3. Completed (100% or done language) is NEVER overdue — completed always wins.
+4. Tomorrow plans are "tomorrow" — never "in_progress".
+5. Sales pipeline numbers must come from the document — never estimate.`;
+}
 
 // ─── New Vision schema ────────────────────────────────────────────────────────
+
+export type TaskClassification = "completed" | "overdue" | "at_risk" | "in_progress" | "blocked" | "tomorrow";
+
+export interface SalesPipeline {
+  new_leads_today: number | null;
+  leads_contacted: number | null;
+  hot_responsive: number | null;
+  qualified: number | null;
+  hot_but_cold: number | null;
+  proposals_sent: number | null;
+}
 
 export interface VisionParsedReport {
   personName: string;
   reportDate: string;
   department: string;
+  salesPipeline?: SalesPipeline | null;
   plannedObjectives: Array<{ objective: string; completionNote: string }>;
   activities: Array<{ startTime: string; endTime: string; durationHours: number; description: string }>;
   totalHoursWorked: number;
@@ -62,6 +144,9 @@ export interface VisionParsedReport {
     status: string;
     percentageComplete: number;
     observationsAndBlockers: string;
+    classification?: TaskClassification;
+    daysOverdue?: number | null;
+    subcategory?: string;
   }>;
   risksAndEscalations: string[];
   executiveSummary: string;
@@ -74,17 +159,21 @@ export interface ExtractedReportData {
   tasks: {
     description: string;
     projectName: string | null;
+    classification?: TaskClassification;
+    daysOverdue?: number | null;
+    subcategory?: string | null;
     status: "on_track" | "at_risk" | "blocked" | "complete";
     pctComplete: number | null;
     hoursToday: number | null;
     dueDate: string | null;
   }[];
+  salesPipeline?: SalesPipeline | null;
   notes: string | null;
   blockers: string | null;
   totalHours: number | null;
   riskSignals: string[];
   projectsMentioned: string[];
-  reportDate?: string | null; // YYYY-MM-DD extracted from report content
+  reportDate?: string | null;
   pages?: { pageNumber: number; includeVisual: boolean }[];
 }
 
@@ -140,11 +229,22 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
       } catch { /* ignore bad dates */ }
     }
 
+    // Prefer AI-provided classification; fall back to status-derived value
+    const classification: TaskClassification | undefined = p.classification ?? (() => {
+      if (status === "complete") return "completed";
+      if (status === "blocked") return "blocked";
+      if (status === "at_risk") return "at_risk";
+      return "in_progress";
+    })();
+
     return {
       description: p.observationsAndBlockers
         ? `[${p.projectName}] ${p.observationsAndBlockers}`
         : p.projectName,
       projectName: p.projectName,
+      classification,
+      daysOverdue: p.daysOverdue ?? null,
+      subcategory: p.subcategory || null,
       status,
       // Use ?? not || so that 0% is preserved as 0, not collapsed to null
       pctComplete: p.percentageComplete ?? null,
@@ -176,6 +276,7 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
   return {
     summary: vision.executiveSummary || vision.activities.map((a) => a.description).join("; "),
     tasks,
+    salesPipeline: vision.salesPipeline ?? null,
     notes: objectivesNote || null,
     blockers: blockerProjects.join("; ") || null,
     totalHours: vision.totalHoursWorked || null,
@@ -320,6 +421,7 @@ async function extractReportVisionNative(
   const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
 
   console.log(`[vision-native] PDF ${pdfBuffer.length}b (${Math.round(pdfBuffer.length / 1024)}KB) → API call start`);
+  const todayIso = new Date().toISOString().split("T")[0];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentBlocks: any[] = [
@@ -331,7 +433,7 @@ async function extractReportVisionNative(
         data: pdfBuffer.toString("base64"),
       },
     },
-    { type: "text", text: VISION_PARSING_INSTRUCTION },
+    { type: "text", text: buildVisionInstruction(todayIso) },
   ];
 
   const message = await client.messages.create({
@@ -382,7 +484,7 @@ async function extractPdfTextFallback(buffer: Buffer): Promise<string> {
 
 // ─── Single-batch vision API call (canvas-based, local dev only) ──────────────
 
-async function callClaudeVisionBatch(pageImages: Buffer[], client: Anthropic): Promise<VisionParsedReport> {
+async function callClaudeVisionBatch(pageImages: Buffer[], client: Anthropic, todayIso: string): Promise<VisionParsedReport> {
   const imageBlocks = pageImages.map((img) => ({
     type: "image" as const,
     source: {
@@ -398,7 +500,7 @@ async function callClaudeVisionBatch(pageImages: Buffer[], client: Anthropic): P
     messages: [{
       role: "user",
       content: [
-        { type: "text", text: VISION_PARSING_INSTRUCTION },
+        { type: "text", text: buildVisionInstruction(todayIso) },
         ...imageBlocks,
       ],
     }],
@@ -425,6 +527,7 @@ export async function extractReportVision(
   }
 
   const PAGES_PER_BATCH = 10;
+  const todayIso = new Date().toISOString().split("T")[0];
 
   if (pageCount > PAGES_PER_BATCH) {
     // Process in batches of 10 pages, merge results
@@ -433,7 +536,7 @@ export async function extractReportVision(
       const end = Math.min(start + PAGES_PER_BATCH - 1, pageCount);
       batches.push(
         pdfToPageImages(pdfBuffer, start, end).then((imgs) =>
-          callClaudeVisionBatch(imgs, client)
+          callClaudeVisionBatch(imgs, client, todayIso)
         )
       );
     }
@@ -441,7 +544,7 @@ export async function extractReportVision(
     return mergeVisionReports(parts);
   } else {
     const pageImages = await pdfToPageImages(pdfBuffer, 1, pageCount || undefined);
-    return callClaudeVisionBatch(pageImages, client);
+    return callClaudeVisionBatch(pageImages, client, todayIso);
   }
 }
 
@@ -490,7 +593,9 @@ function parseExtractedJson(raw: string): ExtractedReportData {
 }
 
 export async function extractReportData(rawText: string, apiKey?: string | null): Promise<ExtractedReportData> {
-  const prompt = loadPrompt("extract-report.txt");
+  const rawPrompt = loadPrompt("extract-report.txt");
+  const todayIso = new Date().toISOString().split("T")[0];
+  const prompt = rawPrompt.replace(/\{\{TODAY_DATE\}\}/g, todayIso);
   const raw = await callClaude(prompt, rawText, "claude-haiku-4-5-20251001", apiKey);
   try {
     return parseExtractedJson(raw);
@@ -536,11 +641,12 @@ export async function extractReportDataFromFile(
     const imgMime = (
       mimeType.startsWith("image/") ? mimeType : `image/${ext === "jpg" ? "jpeg" : ext}`
     ) as "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+    const todayIso = new Date().toISOString().split("T")[0];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contentBlocks: any[] = [
       { type: "image", source: { type: "base64", media_type: imgMime, data: buffer.toString("base64") } },
-      { type: "text", text: VISION_PARSING_INSTRUCTION },
+      { type: "text", text: buildVisionInstruction(todayIso) },
     ];
     console.log(`[vision-ingest] ${filename}: routing=image/${ext} → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`);
 
@@ -563,6 +669,7 @@ export async function extractReportDataFromFile(
   // Excel, DOCX, PPTX, CSV, plain text → rendered PDF → Claude reads visually
   // Never extracts raw text. pdf-lib is pure JS, works on Vercel with no native deps.
   const pdfBuffer = await anyFileToPdf(buffer, mimeType, filename);
+  const todayIsoForFile = new Date().toISOString().split("T")[0];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentBlocks: any[] = [
@@ -570,7 +677,7 @@ export async function extractReportDataFromFile(
       type: "document",
       source: { type: "base64", media_type: "application/pdf", data: pdfBuffer.toString("base64") },
     },
-    { type: "text", text: VISION_PARSING_INSTRUCTION },
+    { type: "text", text: buildVisionInstruction(todayIsoForFile) },
   ];
   console.log(
     `[vision-ingest] ${filename}: routing=${ext}→PDF (${pdfBuffer.length}b ${Math.round(pdfBuffer.length / 1024)}KB) → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`
