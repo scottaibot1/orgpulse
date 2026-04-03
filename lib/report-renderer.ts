@@ -45,6 +45,16 @@ export interface AttentionItem {
   action: string;
 }
 
+export interface NeedsAttentionItem {
+  status: "overdue" | "imminentlyDue" | "dueSoon" | "blocked";
+  daysOverdue?: number | null;
+  dueDate?: string | null;
+  pctComplete?: number | null;
+  who: string;
+  department?: string;
+  text: string;
+}
+
 export interface NotableProgressGroup {
   department: string;
   items: string[];
@@ -52,11 +62,13 @@ export interface NotableProgressGroup {
 
 export interface AiSummaryData {
   todaysPulse: string;
-  organizationPulse?: string; // legacy — no longer generated; kept for backward compat with old saved summaries
-  attentionItems?: AttentionItem[];
-  criticalAlerts?: { type: "blocker" | "atrisk"; department?: string; text: string }[]; // legacy — merged into attentionItems in new reports
-  // notableProgress can be the new grouped format or legacy flat string[]
-  notableProgress: NotableProgressGroup[] | string[];
+  organizationPulse?: string; // legacy
+  attentionItems?: AttentionItem[]; // legacy — superseded by needsAttentionNow
+  criticalAlerts?: { type: "blocker" | "atrisk"; department?: string; text: string }[]; // legacy
+  needsAttentionNow?: NeedsAttentionItem[]; // new structured org-level attention section
+  waitingOnExternal?: { text: string; who: string }[];
+  // notableProgress can be the new grouped format (with overflowNote) or legacy flat string[]
+  notableProgress: (NotableProgressGroup & { overflowNote?: string | null })[] | string[];
   completenessScore: {
     totalExpected: number;
     freshToday: number;
@@ -106,14 +118,26 @@ export function parseAiSummary(text: string): AiSummaryData | null {
 }
 
 // Normalize notableProgress to grouped format regardless of what the AI returned
-function normalizeProgress(raw: NotableProgressGroup[] | string[]): NotableProgressGroup[] {
+function normalizeProgress(raw: (NotableProgressGroup & { overflowNote?: string | null })[] | string[]): (NotableProgressGroup & { overflowNote?: string | null })[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   if (typeof raw[0] === "string") {
-    // Legacy flat format — put everything under a single group
     return [{ department: "", items: raw as string[] }];
   }
-  return raw as NotableProgressGroup[];
+  return raw as (NotableProgressGroup & { overflowNote?: string | null })[];
 }
+
+// Strip ✅ emoji from AI-generated text — the UI renders completion indicators
+function stripCheckmark(text: string): string {
+  return text.replace(/✅\s*/g, "").trim();
+}
+
+// Needs Attention Now status config
+const ATTENTION_STATUS: Record<string, { label: string; emoji: string; bg: string; border: string; color: string; badgeBg: string; badgeColor: string }> = {
+  overdue:       { label: "OVERDUE",         emoji: "🔥", bg: "#fff7ed", border: "#f97316", color: "#7c2d12", badgeBg: "#dc2626", badgeColor: "#fff" },
+  imminentlyDue: { label: "DUE WITHIN 3d",  emoji: "⚠️", bg: "#fffbeb", border: "#f59e0b", color: "#78350f", badgeBg: "#f59e0b", badgeColor: "#fff" },
+  dueSoon:       { label: "DUE WITHIN 7d",  emoji: "📅", bg: "#eff6ff", border: "#3b82f6", color: "#1e3a5f", badgeBg: "#3b82f6", badgeColor: "#fff" },
+  blocked:       { label: "BLOCKED",         emoji: "🚫", bg: "#fef2f2", border: "#ef4444", color: "#7f1d1d", badgeBg: "#ef4444", badgeColor: "#fff" },
+};
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -143,10 +167,11 @@ function personInitial(name: string) {
 
 // ─── Category-grouped highlights ─────────────────────────────────────────────
 
-// Render OVERDUE prefix in red bold inside the text
+// Render OVERDUE prefix in red bold inside the text; also strip stray ✅ emojis
 function formatHighlightText(text: string): string {
-  if (!text.startsWith("OVERDUE")) return text;
-  return text.replace(/^OVERDUE\s*[·\-]?\s*/,
+  const clean = stripCheckmark(text);
+  if (!clean.startsWith("OVERDUE")) return clean;
+  return clean.replace(/^OVERDUE\s*[·\-]?\s*/,
     '<span style="color:#dc2626;font-weight:800;font-size:10px;letter-spacing:0.04em;">OVERDUE</span> · ');
 }
 
@@ -208,6 +233,83 @@ function groupedHighlightsEmail(highlights: HighlightItem[]): string {
     </td></tr>`;
   }
   return out;
+}
+
+// ─── Needs Attention Now — PDF ───────────────────────────────────────────────
+
+function pdfNeedsAttentionNow(items: NeedsAttentionItem[], waiting: { text: string; who: string }[]): string {
+  if (items.length === 0 && waiting.length === 0) {
+    return `<div style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:12px 40px;">
+      <div style="font-size:12px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">🟢 Needs Attention Now</div>
+      <div style="font-size:13px;color:#166534;">No overdue, imminently due, or blocked items today.</div>
+    </div>`;
+  }
+  const rows = items.map((item) => {
+    const s = ATTENTION_STATUS[item.status] ?? ATTENTION_STATUS.blocked;
+    const badge = `<span style="display:inline-block;background:${s.badgeBg};color:${s.badgeColor};border-radius:4px;padding:1px 7px;font-size:10px;font-weight:800;letter-spacing:0.04em;margin-right:6px;">${item.daysOverdue ? `${item.daysOverdue}d OVERDUE` : s.label}</span>`;
+    const meta: string[] = [];
+    if (item.dueDate) meta.push(`due ${item.dueDate}`);
+    if (item.pctComplete != null) meta.push(`${item.pctComplete}%`);
+    meta.push(item.who + (item.department ? ` · ${item.department}` : ""));
+    return `<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:7px;padding:10px 14px;background:${s.bg};border-radius:8px;border-left:4px solid ${s.border};">
+      <span style="font-size:15px;flex-shrink:0;line-height:1.3;">${s.emoji}</span>
+      <div style="flex:1;min-width:0;">
+        ${badge}
+        <span style="font-size:13px;font-weight:700;color:${s.color};">${item.text}</span>
+        <div style="font-size:11px;color:#78716c;margin-top:3px;">${meta.join(" · ")}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const waitingRows = waiting.length > 0 ? `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;">
+      <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">⏳ Waiting on External</div>
+      ${waiting.map(w => `<div style="font-size:12px;color:#64748b;margin-bottom:4px;">· ${w.text} <span style="color:#94a3b8;">(${w.who})</span></div>`).join("")}
+    </div>` : "";
+
+  return `<div style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 40px;">
+    <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 Needs Attention Now</div>
+    ${rows}${waitingRows}
+  </div>`;
+}
+
+// ─── Needs Attention Now — Email ──────────────────────────────────────────────
+
+function emailNeedsAttentionNow(items: NeedsAttentionItem[], waiting: { text: string; who: string }[]): string {
+  if (items.length === 0 && waiting.length === 0) {
+    return `<tr><td style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:10px 24px;">
+      <span style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;">🟢 Needs Attention Now — </span>
+      <span style="font-size:12px;color:#166534;">No overdue, imminently due, or blocked items today.</span>
+    </td></tr>`;
+  }
+  const rows = items.map((item) => {
+    const s = ATTENTION_STATUS[item.status] ?? ATTENTION_STATUS.blocked;
+    const badgeText = item.daysOverdue ? `${item.daysOverdue}d OVERDUE` : s.label;
+    const meta: string[] = [];
+    if (item.dueDate) meta.push(`due ${item.dueDate}`);
+    if (item.pctComplete != null) meta.push(`${item.pctComplete}%`);
+    meta.push(item.who + (item.department ? ` · ${item.department}` : ""));
+    return `<tr><td style="padding:3px 0;">
+      <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:5px;"><tr>
+        <td width="24" valign="top" style="padding:8px 6px 8px 10px;background:${s.bg};border-left:4px solid ${s.border};font-size:14px;">${s.emoji}</td>
+        <td style="padding:8px 10px;background:${s.bg};">
+          <span style="display:inline-block;background:${s.badgeBg};color:${s.badgeColor};border-radius:3px;padding:1px 6px;font-size:9px;font-weight:800;margin-right:5px;">${badgeText}</span>
+          <span style="font-size:12px;font-weight:700;color:${s.color};">${item.text}</span>
+          <div style="font-size:11px;color:#78716c;margin-top:2px;">${meta.join(" · ")}</div>
+        </td>
+      </tr></table>
+    </td></tr>`;
+  }).join("");
+
+  const waitingRows = waiting.length > 0 ? `
+    <tr><td style="padding:8px 0 4px;font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;border-top:1px dashed #e2e8f0;margin-top:6px;">⏳ Waiting on External</td></tr>
+    ${waiting.map(w => `<tr><td style="font-size:12px;color:#64748b;padding:2px 0;">· ${w.text} <span style="color:#94a3b8;">(${w.who})</span></td></tr>`).join("")}
+    ` : "";
+
+  return `<tr><td style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:14px 24px;">
+    <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 Needs Attention Now</div>
+    <table cellpadding="0" cellspacing="0" width="100%">${rows}${waitingRows}</table>
+  </td></tr>`;
 }
 
 // ─── PDF renderer ────────────────────────────────────────────────────────────
@@ -338,54 +440,50 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const pct = cs.percentage ?? 0;
   const missing = cs.missing ?? [];
 
-  // What Needs Attention — attention items + legacy criticalAlerts merged together
-  const allAttentionItems = data.attentionItems ?? [];
-  // Build legacy critical alert items as attention items for backward compat
-  const legacyCriticalItems: AttentionItem[] = (data.criticalAlerts ?? []).map((a) => ({
-    emoji: a.type === "blocker" ? "🚨" : "⚠️",
-    department: a.department ?? "General",
-    description: a.text,
-    who: a.department ?? "",
-    action: "Review and address",
-  }));
-  const combinedAttentionItems = [...allAttentionItems, ...legacyCriticalItems];
-
+  // Needs Attention Now — new structured format, with backward-compat fallback to legacy attentionItems
   const attentionSection = (() => {
-    if (combinedAttentionItems.length === 0) {
+    if (data.needsAttentionNow !== undefined) {
+      // New format
+      return pdfNeedsAttentionNow(data.needsAttentionNow ?? [], data.waitingOnExternal ?? []);
+    }
+    // Legacy fallback
+    const legacyItems: AttentionItem[] = [
+      ...(data.attentionItems ?? []),
+      ...(data.criticalAlerts ?? []).map((a) => ({
+        emoji: a.type === "blocker" ? "🚨" : "⚠️",
+        department: a.department ?? "General",
+        description: a.text,
+        who: a.department ?? "",
+        action: "Review and address",
+      })),
+    ];
+    if (legacyItems.length === 0) {
       return `<div style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:12px 40px;">
-        <div style="font-size:12px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">🟢 What Needs Attention</div>
+        <div style="font-size:12px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">🟢 Needs Attention Now</div>
         <div style="font-size:13px;color:#166534;">No items requiring executive action today.</div>
       </div>`;
     }
-    const byDept = new Map<string, AttentionItem[]>();
-    for (const item of combinedAttentionItems) {
-      const dept = item.department || "General";
-      if (!byDept.has(dept)) byDept.set(dept, []);
-      byDept.get(dept)!.push(item);
-    }
-    const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
-      ${dept && dept !== "General" ? `<div style="font-size:10px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;margin-top:10px;padding-bottom:3px;border-bottom:1px solid #fed7aa;">${dept}</div>` : ""}
-      ${items.map((item) => `
-        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid #f97316;">
-          <span style="font-size:16px;flex-shrink:0;line-height:1.3;">${item.emoji}</span>
-          <div style="flex:1;min-width:0;">
-            <span style="font-size:13px;font-weight:700;color:#7c2d12;">${item.description}</span>
-            ${item.who ? `<span style="font-size:13px;color:#92400e;"> (${item.who})</span>` : ""}
-            ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
-          </div>
-        </div>`).join("")}
-    `).join("");
+    const rows = legacyItems.map((item) => `
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid #f97316;">
+        <span style="font-size:16px;flex-shrink:0;line-height:1.3;">${item.emoji}</span>
+        <div style="flex:1;min-width:0;">
+          <span style="font-size:13px;font-weight:700;color:#7c2d12;">${item.description}</span>
+          ${item.who ? `<span style="font-size:13px;color:#92400e;"> (${item.who})</span>` : ""}
+          ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
+        </div>
+      </div>`).join("");
     return `<div style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 40px;">
-      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">🔥 What Needs Attention</div>
-      ${deptBlocks}
+      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">🔥 Needs Attention Now</div>
+      ${rows}
     </div>`;
   })();
 
-  // Notable progress — grouped by department
+  // Notable progress — grouped by department, with per-group overflowNote support
   const progressSection = progressGroups.length > 0 ? (() => {
     const deptBlocks = progressGroups.map((g) => `
       ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
-      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">✓ ${stripCheckmark(item)}</div>`).join("")}
+      ${g.overflowNote ? `<div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:4px;">${g.overflowNote}</div>` : ""}
     `).join("");
     return `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
       <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🏆 Notable Progress</div>
@@ -573,55 +671,51 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const pct = cs.percentage ?? 0;
   const missingCount = (cs.missing ?? []).length;
 
-  // What Needs Attention — attention items + legacy criticalAlerts merged together (email)
-  const emailAllAttentionItems = data.attentionItems ?? [];
-  const emailLegacyCriticalItems: AttentionItem[] = (data.criticalAlerts ?? []).map((a) => ({
-    emoji: a.type === "blocker" ? "🚨" : "⚠️",
-    department: a.department ?? "General",
-    description: a.text,
-    who: a.department ?? "",
-    action: "Review and address",
-  }));
-  const emailCombinedAttentionItems = [...emailAllAttentionItems, ...emailLegacyCriticalItems];
-
+  // Needs Attention Now — email (new format with backward-compat fallback)
   const emailAttentionSection = (() => {
-    if (emailCombinedAttentionItems.length === 0) {
+    if (data.needsAttentionNow !== undefined) {
+      return emailNeedsAttentionNow(data.needsAttentionNow ?? [], data.waitingOnExternal ?? []);
+    }
+    // Legacy fallback
+    const legacyItems: AttentionItem[] = [
+      ...(data.attentionItems ?? []),
+      ...(data.criticalAlerts ?? []).map((a) => ({
+        emoji: a.type === "blocker" ? "🚨" : "⚠️",
+        department: a.department ?? "General",
+        description: a.text,
+        who: a.department ?? "",
+        action: "Review and address",
+      })),
+    ];
+    if (legacyItems.length === 0) {
       return `<tr><td style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:10px 24px;">
-        <span style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;">🟢 What Needs Attention — </span>
+        <span style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;">🟢 Needs Attention Now — </span>
         <span style="font-size:12px;color:#166534;">No items requiring executive action today.</span>
       </td></tr>`;
     }
-    const byDept = new Map<string, AttentionItem[]>();
-    for (const item of emailCombinedAttentionItems) {
-      const dept = item.department || "General";
-      if (!byDept.has(dept)) byDept.set(dept, []);
-      byDept.get(dept)!.push(item);
-    }
-    const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
-      ${dept && dept !== "General" ? `<tr><td style="padding:8px 0 4px;font-size:9px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #fed7aa;">${dept}</td></tr>` : ""}
-      ${items.map((item) => `
-        <tr><td style="padding:4px 0;">
-          <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:4px;"><tr>
-            <td style="width:26px;padding:8px 4px 8px 10px;background:#fff;border-left:4px solid #f97316;vertical-align:top;font-size:14px;">${item.emoji}</td>
-            <td style="padding:8px 12px;background:#fff;vertical-align:top;">
-              <span style="font-size:12px;font-weight:700;color:#7c2d12;">${item.description}</span>
-              ${item.who ? `<span style="font-size:12px;color:#92400e;"> (${item.who})</span>` : ""}
-              ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
-            </td>
-          </tr></table>
-        </td></tr>`).join("")}
-    `).join("");
+    const rows = legacyItems.map((item) => `
+      <tr><td style="padding:4px 0;">
+        <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:4px;"><tr>
+          <td style="width:26px;padding:8px 4px 8px 10px;background:#fff;border-left:4px solid #f97316;vertical-align:top;font-size:14px;">${item.emoji}</td>
+          <td style="padding:8px 12px;background:#fff;vertical-align:top;">
+            <span style="font-size:12px;font-weight:700;color:#7c2d12;">${item.description}</span>
+            ${item.who ? `<span style="font-size:12px;color:#92400e;"> (${item.who})</span>` : ""}
+            ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
+          </td>
+        </tr></table>
+      </td></tr>`).join("");
     return `<tr><td style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 24px;">
-      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 What Needs Attention</div>
-      <table cellpadding="0" cellspacing="0" width="100%">${deptBlocks}</table>
+      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 Needs Attention Now</div>
+      <table cellpadding="0" cellspacing="0" width="100%">${rows}</table>
     </td></tr>`;
   })();
 
-  // Notable progress — grouped by department
+  // Notable progress — grouped by department (email), with overflowNote and ✅ stripping
   const progressSection = progressGroups.length > 0 ? (() => {
     const deptBlocks = progressGroups.map((g) => `
       ${g.department ? `<div style="font-size:10px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #86efac;">${g.department}</div>` : ""}
-      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">${item}</div>`).join("")}
+      ${(g.items ?? []).map((item) => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;">✓ ${stripCheckmark(item)}</div>`).join("")}
+      ${g.overflowNote ? `<div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:4px;">${g.overflowNote}</div>` : ""}
     `).join("");
     return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;overflow:hidden;">
       <tr><td style="padding:14px 16px;">
