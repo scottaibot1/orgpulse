@@ -117,6 +117,7 @@ function mapProjectStatus(s: string, pctComplete?: number | null): ExtractedRepo
 }
 
 export function visionToExtractedData(vision: VisionParsedReport): ExtractedReportData {
+  console.log(`[visionToExtractedData] in: ${vision.projects.length} projects, ${vision.activities.length} activities`);
   // Each project row → its own task (preserving row boundary)
   const projectTasks = vision.projects.map((p) => ({
     description: p.observationsAndBlockers
@@ -147,9 +148,11 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
     .map((o) => o.objective + (o.completionNote ? ` (${o.completionNote})` : ""))
     .join("; ");
 
+  const tasks = [...projectTasks, ...activityTasks];
+  console.log(`[visionToExtractedData] out: ${tasks.length} tasks (${projectTasks.length} projects + ${activityTasks.length} activities)`);
   return {
     summary: vision.executiveSummary || vision.activities.map((a) => a.description).join("; "),
-    tasks: [...projectTasks, ...activityTasks],
+    tasks,
     notes: objectivesNote || null,
     blockers: blockerProjects.join("; ") || null,
     totalHours: vision.totalHoursWorked || null,
@@ -293,6 +296,8 @@ async function extractReportVisionNative(
 ): Promise<VisionParsedReport> {
   const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
 
+  console.log(`[vision-native] PDF ${pdfBuffer.length}b (${Math.round(pdfBuffer.length / 1024)}KB) → API call start`);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contentBlocks: any[] = [
     {
@@ -307,14 +312,31 @@ async function extractReportVisionNative(
   ];
 
   const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-sonnet-4-6",
     max_tokens: 8192,
     messages: [{ role: "user", content: contentBlocks }],
   });
 
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from native PDF call");
-  return parseVisionJson(content.text);
+
+  const rawText = content.text;
+  const stopReason = message.stop_reason;
+  console.log(`[vision-native] stop_reason=${stopReason} response_chars=${rawText.length} project_mentions=${(rawText.match(/"projectName"/g) ?? []).length}`);
+
+  if (stopReason === "max_tokens") {
+    console.error(`[vision-native] TRUNCATED: hit max_tokens — JSON is incomplete. Last 150 chars: ...${rawText.slice(-150)}`);
+    throw new Error("vision-response-truncated: hit max_tokens limit");
+  }
+
+  try {
+    const parsed = parseVisionJson(rawText);
+    console.log(`[vision-native] parsed OK: ${parsed.projects.length} projects, ${parsed.activities.length} activities`);
+    return parsed;
+  } catch (e) {
+    console.error(`[vision-native] JSON parse failed after ${rawText.length} chars. Last 150: ...${rawText.slice(-150)}`);
+    throw e;
+  }
 }
 
 // ─── pdfjs text extraction fallback (last resort, no canvas needed) ───────────
@@ -411,10 +433,11 @@ export async function extractReportDataFromPdf(
     const vision = await extractReportVisionNative(pdfBuffer, apiKey);
     return visionToExtractedData(vision);
   } catch (err) {
-    console.error("Native PDF extraction failed, trying text fallback:", err);
+    console.error("[extractReportDataFromPdf] Native PDF extraction failed — FALLING BACK TO TEXT. Tables/structure will be lost. Error:", err);
   }
 
   // Fallback: pdfjs text extraction + text-based Claude call
+  console.log("[extractReportDataFromPdf] Text fallback path: extracting plain text from PDF");
   try {
     const text = await extractPdfTextFallback(pdfBuffer);
     if (text && text.length >= 10) {
@@ -499,14 +522,17 @@ export async function extractReportDataFromFile(
     console.log(`[vision-ingest] ${filename}: routing=image/${ext} → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`);
 
     const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-4-6",
       max_tokens: 8192,
       messages: [{ role: "user", content: contentBlocks }],
     });
 
     const content = message.content[0];
     if (content.type !== "text") throw new Error("Unexpected response type from image vision call");
-    const vision = parseVisionJson(content.text);
+    const rawText = content.text;
+    const stopReason = message.stop_reason;
+    console.log(`[vision-ingest] ${filename}: image stop_reason=${stopReason} chars=${rawText.length}`);
+    const vision = parseVisionJson(rawText);
     return { data: visionToExtractedData(vision), usedVision: true };
   }
 
@@ -524,19 +550,37 @@ export async function extractReportDataFromFile(
     { type: "text", text: VISION_PARSING_INSTRUCTION },
   ];
   console.log(
-    `[vision-ingest] ${filename}: routing=${ext}→PDF (${pdfBuffer.length} bytes) → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`
+    `[vision-ingest] ${filename}: routing=${ext}→PDF (${pdfBuffer.length}b ${Math.round(pdfBuffer.length / 1024)}KB) → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`
   );
 
   const message = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-sonnet-4-6",
     max_tokens: 8192,
     messages: [{ role: "user", content: contentBlocks }],
   });
 
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from document vision call");
-  const vision = parseVisionJson(content.text);
-  return { data: visionToExtractedData(vision), usedVision: true };
+
+  const rawText = content.text;
+  const stopReason = message.stop_reason;
+  console.log(
+    `[vision-ingest-response] ${filename}: stop_reason=${stopReason} chars=${rawText.length} project_mentions=${(rawText.match(/"projectName"/g) ?? []).length}`
+  );
+
+  if (stopReason === "max_tokens") {
+    console.error(`[vision-ingest] TRUNCATED: ${filename} hit max_tokens. Last 150: ...${rawText.slice(-150)}`);
+    throw new Error("vision-response-truncated: hit max_tokens limit");
+  }
+
+  try {
+    const vision = parseVisionJson(rawText);
+    console.log(`[vision-ingest] ${filename}: parsed OK — ${vision.projects.length} projects, ${vision.activities.length} activities`);
+    return { data: visionToExtractedData(vision), usedVision: true };
+  } catch (e) {
+    console.error(`[vision-ingest] ${filename}: JSON parse failed after ${rawText.length} chars. Last 150: ...${rawText.slice(-150)}`);
+    throw e;
+  }
 }
 
 // ─── Canonical narrative ──────────────────────────────────────────────────────
