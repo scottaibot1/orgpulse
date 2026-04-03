@@ -228,7 +228,14 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     if (reportDetailLevel >= 3 && activeReport?.structuredData) {
       const sd = activeReport.structuredData as {
         summary?: string;
-        tasks?: { description: string; status: string; hoursToday?: number | null; projectName?: string | null }[];
+        tasks?: {
+          description: string;
+          status: string;
+          hoursToday?: number | null;
+          projectName?: string | null;
+          pctComplete?: number | null;
+          dueDate?: string | null;
+        }[];
         notes?: string | null;
         blockers?: string | null;
         totalHours?: number | null;
@@ -238,7 +245,9 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         const taskLines = sd.tasks.map((t) => {
           const hrs = t.hoursToday != null ? ` [${t.hoursToday}h]` : "";
           const proj = t.projectName ? ` — ${t.projectName}` : "";
-          return `• ${t.description}${proj}${hrs} (${t.status})`;
+          const due = t.dueDate ? ` · due ${t.dueDate}` : "";
+          const pct = t.pctComplete != null ? ` · ${t.pctComplete}%` : "";
+          return `• ${t.description}${proj}${hrs} (${t.status})${due}${pct}`;
         }).join("\n");
 
         builtNarrative = [
