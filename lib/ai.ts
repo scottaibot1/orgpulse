@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "fs";
 import path from "path";
+import { extractTextFromBuffer } from "./extract-text";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -459,6 +460,61 @@ export async function extractReportData(rawText: string, apiKey?: string | null)
       pages: [],
     };
   }
+}
+
+// ─── Unified file extraction (routes by type: PDF, image, or rich text) ──────
+
+export async function extractReportDataFromFile(
+  buffer: Buffer,
+  mimeType: string,
+  filename: string,
+  apiKey?: string | null
+): Promise<{ data: ExtractedReportData; usedVision: boolean }> {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  const isPdf = mimeType === "application/pdf" || ext === "pdf";
+  const isImage =
+    ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(mimeType) ||
+    ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
+
+  if (isPdf) {
+    const data = await extractReportDataFromPdf(buffer, apiKey);
+    return { data, usedVision: true };
+  }
+
+  if (isImage) {
+    const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
+    const imgMime = (
+      mimeType.startsWith("image/") ? mimeType : `image/${ext === "jpg" ? "jpeg" : ext}`
+    ) as "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+
+    const message = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 8192,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: imgMime, data: buffer.toString("base64") },
+          },
+          { type: "text", text: VISION_PARSING_INSTRUCTION },
+        ],
+      }],
+    });
+
+    const content = message.content[0];
+    if (content.type !== "text") throw new Error("Unexpected response type from image vision call");
+    const vision = parseVisionJson(content.text);
+    return { data: visionToExtractedData(vision), usedVision: true };
+  }
+
+  // Excel / DOCX / PPTX / plain text → rich HTML → text extraction
+  const richText = await extractTextFromBuffer(buffer, mimeType, filename);
+  if (!richText || richText.length < 10) {
+    throw new Error("File appears to be empty or unreadable");
+  }
+  const data = await extractReportData(richText, apiKey);
+  return { data, usedVision: false };
 }
 
 // ─── Canonical narrative ──────────────────────────────────────────────────────

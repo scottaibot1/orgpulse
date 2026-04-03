@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { extractTextFromBuffer } from "@/lib/extract-text";
-import { extractReportData, extractReportDataFromPdf, getPdfPageCount, updateCanonicalNarrative, type ExtractedReportData } from "@/lib/ai";
+import { extractReportDataFromFile, getPdfPageCount, updateCanonicalNarrative, type ExtractedReportData } from "@/lib/ai";
 import { PDFDocument } from "pdf-lib";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,6 +19,10 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.ms-powerpoint",
   "text/plain",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
 ];
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -65,7 +68,7 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
   const file = formData.get("file") as File | null;
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
-  if (!ALLOWED_TYPES.includes(file.type) && !file.name.match(/\.(pdf|docx?|pptx?|xlsx?|txt|md)$/i)) {
+  if (!ALLOWED_TYPES.includes(file.type) && !file.name.match(/\.(pdf|docx?|pptx?|xlsx?|txt|md|png|jpe?g|gif|webp)$/i)) {
     return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
   }
   if (file.size > MAX_FILE_SIZE) {
@@ -105,21 +108,18 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
 
   const apiKey = user.organization?.workspaceSettings?.anthropicApiKey ?? null;
 
-  // AI extraction — PDFs go directly to Claude, everything else gets text-extracted first
+  // AI extraction — all file types go through the unified vision-first pipeline
   let extracted: ExtractedReportData;
-  let rawText = "";
+  let usedVision = false;
   try {
-    if (isPdf) {
-      extracted = await extractReportDataFromPdf(buffer, apiKey);
-    } else {
-      rawText = await extractTextFromBuffer(buffer, file.type, file.name);
-      if (!rawText || rawText.length < 10) {
-        return NextResponse.json({ error: "File appears to be empty or unreadable" }, { status: 422 });
-      }
-      extracted = await extractReportData(rawText, apiKey);
-    }
+    const result = await extractReportDataFromFile(buffer, file.type, file.name, apiKey);
+    extracted = result.data;
+    usedVision = result.usedVision;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "File appears to be empty or unreadable") {
+      return NextResponse.json({ error: msg }, { status: 422 });
+    }
     console.error("Extraction error:", msg);
     return NextResponse.json({ error: `Processing failed: ${msg}` }, { status: 500 });
   }
@@ -185,7 +185,7 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
     data: {
       userId: user.id,
       source: "pdf_upload",
-      rawText: rawText.slice(0, 10000),
+      rawText: "",
       rawPdfUrl: publicUrl,
       reportDate: resolvedReportDate,
       parsed: true,
@@ -203,7 +203,7 @@ async function handlePost(request: NextRequest, params: { token: string } | Prom
       notes: extracted.notes,
       blockers: extracted.blockers,
       totalHours: extracted.totalHours ?? null,
-      parsedWithVision: isPdf,
+      parsedWithVision: usedVision,
       visualPageUrls: visualPageUrls.length > 0 ? visualPageUrls : Prisma.JsonNull,
     },
   });

@@ -36,13 +36,13 @@ export async function extractTextFromBuffer(
     mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     ext === "docx"
   ) {
-    const result = await mammoth.extractRawText({ buffer });
+    const result = await mammoth.convertToHtml({ buffer });
     return result.value.trim();
   }
 
   // DOC (older Word)
   if (mimeType === "application/msword" || ext === "doc") {
-    const result = await mammoth.extractRawText({ buffer });
+    const result = await mammoth.convertToHtml({ buffer });
     return result.value.trim();
   }
 
@@ -54,13 +54,13 @@ export async function extractTextFromBuffer(
     ext === "xls"
   ) {
     const workbook = XLSX.read(buffer, { type: "buffer" });
-    const lines: string[] = [];
+    const parts: string[] = [];
     workbook.SheetNames.forEach((sheetName) => {
       const sheet = workbook.Sheets[sheetName];
-      const csv = XLSX.utils.sheet_to_csv(sheet);
-      if (csv.trim()) lines.push(`Sheet: ${sheetName}\n${csv}`);
+      const html = XLSX.utils.sheet_to_html(sheet);
+      if (html.trim()) parts.push(`<h2>Sheet: ${sheetName}</h2>\n${html}`);
     });
-    return lines.join("\n\n").trim();
+    return parts.join("\n\n").trim();
   }
 
   // PPTX
@@ -68,7 +68,7 @@ export async function extractTextFromBuffer(
     mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
     ext === "pptx"
   ) {
-    return extractPptxText(buffer);
+    return extractPptxHtml(buffer);
   }
 
   // PPT (older PowerPoint — fallback to basic extraction)
@@ -85,22 +85,31 @@ export async function extractTextFromBuffer(
   throw new Error(`Unsupported file type: ${mimeType} (.${ext})`);
 }
 
-async function extractPptxText(buffer: Buffer): Promise<string> {
-  const texts: string[] = [];
+async function extractPptxHtml(buffer: Buffer): Promise<string> {
+  const slides: string[] = [];
   const directory = await unzipper.Open.buffer(buffer);
 
-  for (const entry of directory.files) {
-    if (entry.path.match(/^ppt\/slides\/slide\d+\.xml$/)) {
-      const content = await entry.buffer();
-      const xml = content.toString("utf8");
-      const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) ?? [];
-      const slideText = matches
-        .map((m: string) => m.replace(/<[^>]+>/g, "").trim())
-        .filter(Boolean)
-        .join(" ");
-      if (slideText) texts.push(slideText);
+  // Sort slide files numerically so they come out in order
+  const slideFiles = directory.files
+    .filter((e) => e.path.match(/^ppt\/slides\/slide\d+\.xml$/))
+    .sort((a, b) => {
+      const numA = parseInt(a.path.match(/slide(\d+)\.xml$/)?.[1] ?? "0", 10);
+      const numB = parseInt(b.path.match(/slide(\d+)\.xml$/)?.[1] ?? "0", 10);
+      return numA - numB;
+    });
+
+  for (let idx = 0; idx < slideFiles.length; idx++) {
+    const content = await slideFiles[idx].buffer();
+    const xml = content.toString("utf8");
+    const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g) ?? [];
+    const slideText = matches
+      .map((m: string) => m.replace(/<[^>]+>/g, "").trim())
+      .filter(Boolean)
+      .join(" ");
+    if (slideText) {
+      slides.push(`<section>\n<h3>Slide ${idx + 1}</h3>\n<p>${slideText}</p>\n</section>`);
     }
   }
 
-  return texts.join("\n").trim();
+  return slides.join("\n").trim();
 }
