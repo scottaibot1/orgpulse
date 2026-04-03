@@ -33,6 +33,22 @@ async function runCronWork(): Promise<void> {
     console.error("[Cron] Cleanup error:", e);
   }
 
+  // ── Cleanup — delete stale missing_submission alerts for inactive users ──
+  try {
+    const cleared = await prisma.alert.deleteMany({
+      where: {
+        alertType: "missing_submission",
+        isRead: false,
+        user: { isReportingActive: false },
+      },
+    });
+    if (cleared.count > 0) {
+      console.log(`[Cron] Cleared ${cleared.count} stale missing_submission alert(s) for inactive users`);
+    }
+  } catch (e) {
+    console.error("[Cron] Stale alert cleanup error:", e);
+  }
+
   // Fetch all orgs
   const orgs = await prisma.organization.findMany({
     select: { id: true, name: true, ownerEmail: true, workspaceSettings: true },
