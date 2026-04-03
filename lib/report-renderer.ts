@@ -11,6 +11,15 @@ export interface HighlightItem {
 
 export interface SalesMetric { label: string; value: number | string }
 
+export interface PipelineSnapshot {
+  new_leads_today?: number | null;
+  leads_contacted?: number | null;
+  hot_responsive?: number | null;
+  qualified?: number | null;
+  hot_but_cold?: number | null;
+  proposals_sent?: number | null;
+}
+
 export interface TimeAllocationItem { label: string; hours: number; percent: number }
 
 export interface PersonData {
@@ -24,6 +33,7 @@ export interface PersonData {
   highlights: HighlightItem[];
   overflowNote?: string;
   salesMetrics?: SalesMetric[];
+  pipeline_snapshot?: PipelineSnapshot | null;
 }
 
 export interface DepartmentData {
@@ -132,6 +142,28 @@ function avatarBg(name: string): string {
 
 const BAR_COLORS = ["#378ADD","#1D9E75","#EF9F27","#7F77DD","#888780"];
 
+// ── Color constants ─────────────────────────────────────────────────────────────
+const NAVY_BG          = "#0f172a";
+const OVERDUE_BG       = "#7f1d1d";
+const OVERDUE_TEXT     = "#fca5a5";
+const URGENT_BG        = "#78350f";
+const URGENT_TEXT      = "#fcd34d";
+const TODAY_BADGE_BG   = "#dcfce7";
+const TODAY_BADGE_TEXT = "#15803d";
+const STANDIN_BADGE_BG   = "#fef3c7";
+const STANDIN_BADGE_TEXT  = "#92400e";
+const DUE_DATE_OVERDUE = "#ef4444";
+const DUE_DATE_URGENT  = "#f59e0b";
+const DUE_DATE_NORMAL  = "#9ca3af";
+const PCT_BADGE_BG     = "#f1f5f9";
+const PCT_BADGE_TEXT   = "#6b7280";
+const BULLET_BLUE      = "#378ADD";
+const NOTABLE_BG       = "#f0fdf4";
+const NOTABLE_BORDER   = "#bbf7d0";
+const NOTABLE_DEPT_TEXT = "#15803d";
+const PULSE_TEXT       = "#f1f5f9";
+const PULSE_LABEL_TEXT = "#EF9F27";
+
 const DUE_RE = /\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2})/i;
 const PCT_RE = /\s*[·•]\s*(\d{1,3})%(?!\d)/;
 
@@ -146,13 +178,24 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
   return { clean: text.replace(/\s+/g, " ").trim(), dueDate, pct };
 }
 
-function dueDateColor(iso: string): string {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const due = new Date(iso + "T00:00:00");
-  const diff = Math.floor((due.getTime() - today.getTime()) / 86400000);
-  if (diff < 0) return "#ef4444";
-  if (diff <= 7) return "#f59e0b";
-  return "#9ca3af";
+function getDueDateColor(dueDateStr: string, todayStr: string): string {
+  if (!dueDateStr) return DUE_DATE_NORMAL;
+  const due = new Date(dueDateStr);
+  const today = new Date(todayStr);
+  const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return DUE_DATE_OVERDUE;
+  if (diffDays <= 7) return DUE_DATE_URGENT;
+  return DUE_DATE_NORMAL;
+}
+
+function pctBadge(pct: number | null | undefined): string {
+  if (pct == null) return "";
+  return `<span style="background:${PCT_BADGE_BG};color:${PCT_BADGE_TEXT};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:4px;white-space:nowrap;">${pct}%</span>`;
+}
+
+function pctBadgeEmail(pct: number | null | undefined): string {
+  if (pct == null) return "";
+  return `<span style="background:${PCT_BADGE_BG};color:${PCT_BADGE_TEXT};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:4px;white-space:nowrap;display:inline-block;">${pct}%</span>`;
 }
 
 function fmtMD(iso: string): string {
@@ -172,13 +215,49 @@ function reportHref(name: string, ctx: RenderContext): string | null {
   return link.fileUrl ?? (ctx.appUrl && link.parsedReportId ? `${ctx.appUrl}/report/${link.parsedReportId}` : null);
 }
 
+// ── Pipeline grid ──────────────────────────────────────────────────────────────
+
+function pipelineGrid(snap: PipelineSnapshot): string {
+  const tiles = [
+    { label: "New Today",     value: snap.new_leads_today },
+    { label: "Contacted",     value: snap.leads_contacted },
+    { label: "Hot",           value: snap.hot_responsive },
+    { label: "Qualified",     value: snap.qualified },
+    { label: "Hot but Cold",  value: snap.hot_but_cold },
+    { label: "Proposals",     value: snap.proposals_sent },
+  ];
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+    ${tiles.map(t => `<div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-size:20px;font-weight:500;color:${NAVY_BG};">${t.value ?? 0}</div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${t.label}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
+function pipelineGridEmail(snap: PipelineSnapshot): string {
+  const tiles = [
+    { label: "New Today",    value: snap.new_leads_today },
+    { label: "Contacted",    value: snap.leads_contacted },
+    { label: "Hot",          value: snap.hot_responsive },
+    { label: "Qualified",    value: snap.qualified },
+    { label: "Hot but Cold", value: snap.hot_but_cold },
+    { label: "Proposals",    value: snap.proposals_sent },
+  ];
+  let rows = "";
+  for (let i = 0; i < tiles.length; i += 3) {
+    const chunk = tiles.slice(i, i + 3);
+    rows += `<tr>${chunk.map(t => `<td style="width:33%;padding:4px;"><div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:500;color:${NAVY_BG};">${t.value ?? 0}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${t.label}</div></div></td>`).join("")}</tr>`;
+  }
+  return `<tr><td style="padding:0 0 12px;"><table cellpadding="0" cellspacing="0" width="100%">${rows}</table></td></tr>`;
+}
+
 // ── Attention config ───────────────────────────────────────────────────────────
 
 const ATTN: Record<string, { emoji: string; badgeBg: string; badgeText: string; border: string; rowBg: string }> = {
-  overdue:       { emoji: "🔥", badgeBg: "#7f1d1d", badgeText: "#fca5a5", border: "#ef4444", rowBg: "#fff7ed" },
-  imminentlyDue: { emoji: "⚠️", badgeBg: "#78350f", badgeText: "#fde68a", border: "#f59e0b", rowBg: "#fffbeb" },
-  dueSoon:       { emoji: "📅", badgeBg: "#1e3a5f", badgeText: "#93c5fd", border: "#3b82f6", rowBg: "#eff6ff" },
-  blocked:       { emoji: "🚫", badgeBg: "#7f1d1d", badgeText: "#fca5a5", border: "#dc2626", rowBg: "#fef2f2" },
+  overdue:       { emoji: "🔥", badgeBg: OVERDUE_BG,  badgeText: OVERDUE_TEXT,  border: DUE_DATE_OVERDUE, rowBg: "#fff7ed" },
+  imminentlyDue: { emoji: "⚠️", badgeBg: URGENT_BG,   badgeText: URGENT_TEXT,   border: DUE_DATE_URGENT,  rowBg: "#fffbeb" },
+  dueSoon:       { emoji: "📅", badgeBg: "#1e3a5f",   badgeText: "#93c5fd",     border: "#3b82f6",        rowBg: "#eff6ff" },
+  blocked:       { emoji: "🚫", badgeBg: OVERDUE_BG,  badgeText: OVERDUE_TEXT,  border: "#dc2626",        rowBg: "#fef2f2" },
 };
 
 function attnLabel(item: NeedsAttentionItem): string {
@@ -201,9 +280,9 @@ function pdfPulse(data: AiSummaryData): string {
   );
   const rateBg = pct === 100 ? "#14532d" : "#78350f";
   const rateColor = pct === 100 ? "#86efac" : "#fde68a";
-  return `<div style="background:#0f172a;border-radius:12px;padding:24px 28px 20px;margin-bottom:20px;">
-  <div style="font-size:11px;font-weight:700;color:#EF9F27;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">⚡ Today's Pulse</div>
-  <div style="font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6;margin-bottom:16px;">${data.todaysPulse ?? ""}</div>
+  return `<div style="background:${NAVY_BG};border-radius:12px;padding:24px 28px 20px;margin-bottom:20px;">
+  <div style="font-size:11px;font-weight:700;color:${PULSE_LABEL_TEXT};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">⚡ Today's Pulse</div>
+  <div style="font-size:16px;font-weight:500;color:${PULSE_TEXT};line-height:1.6;margin-bottom:16px;">${data.todaysPulse ?? ""}</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <span style="background:#14532d;color:#86efac;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">✓ ${fresh} submitted</span>
     ${missing > 0
@@ -247,18 +326,19 @@ function pdfNotableProgress(data: AiSummaryData): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   const blocks = groups.map(g => `
-    ${g.department ? `<div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 5px;padding-bottom:3px;border-bottom:1px solid #bbf7d0;">${g.department}</div>` : ""}
+    ${g.department ? `<div style="font-size:10px;font-weight:700;color:${NOTABLE_DEPT_TEXT};text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 5px;padding-bottom:3px;border-bottom:1px solid ${NOTABLE_BORDER};">${g.department}</div>` : ""}
     ${(g.items ?? []).map(item => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;"><span style="color:#16a34a;font-weight:600;margin-right:5px;">✓</span>${stripCheckmark(item)}</div>`).join("")}
     ${g.overflowNote ? `<div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:4px;">${g.overflowNote}</div>` : ""}
   `).join("");
   return `<div style="margin-bottom:20px;">
-  <div style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">🏆 Notable Progress</div>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 18px;">${blocks}</div>
+  <div style="font-size:11px;font-weight:700;color:${NOTABLE_DEPT_TEXT};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">🏆 Notable Progress</div>
+  <div style="background:${NOTABLE_BG};border:1px solid ${NOTABLE_BORDER};border-radius:10px;padding:16px 18px;">${blocks}</div>
 </div>`;
 }
 
 function pdfTaskRow(h: HighlightItem): string {
   const { clean, dueDate, pct } = extractDuePct(h.text);
+  const todayStr = new Date().toISOString().split("T")[0];
   let icon: string;
   if (h.type === "tomorrowfocus") {
     icon = `<span style="font-size:13px;flex-shrink:0;line-height:1.3;margin-top:1px;">📅</span>`;
@@ -269,12 +349,11 @@ function pdfTaskRow(h: HighlightItem): string {
   } else if (h.taskEmoji) {
     icon = `<span style="font-size:13px;flex-shrink:0;line-height:1.3;margin-top:1px;">${h.taskEmoji}</span>`;
   } else {
-    icon = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;flex-shrink:0;margin-top:5px;"></span>`;
+    icon = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${BULLET_BLUE};flex-shrink:0;margin-top:5px;"></span>`;
   }
-  const duePart = dueDate ? `<span style="color:${dueDateColor(dueDate)};font-size:11px;margin-left:6px;">· due ${fmtMD(dueDate)}</span>` : "";
-  const pctPart = pct != null ? `<span style="display:inline-block;background:#f1f5f9;color:#6b7280;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:5px;">${pct}%</span>` : "";
+  const duePart = dueDate ? `<span style="color:${getDueDateColor(dueDate, todayStr)};font-size:11px;margin-left:6px;">· due ${fmtMD(dueDate)}</span>` : "";
   const textColor = h.type === "tomorrowfocus" ? "#475569" : "#1e293b";
-  return `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;">${icon}<div style="flex:1;min-width:0;"><span style="font-size:13px;color:${textColor};line-height:1.5;">${clean}</span>${duePart}${pctPart}</div></div>`;
+  return `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;">${icon}<div style="flex:1;min-width:0;"><span style="font-size:13px;color:${textColor};line-height:1.5;">${clean}</span>${duePart}${pctBadge(pct)}</div></div>`;
 }
 
 function pdfTimeBars(alloc: TimeAllocationItem[], estimated?: boolean): string {
@@ -298,15 +377,17 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext): string {
   const href = reportHref(p.name, ctx);
   const viewLink = href ? `<a href="${href}" style="color:#7c3aed;font-size:12px;font-weight:600;text-decoration:none;">View Submitted Report →</a>` : "";
   const statusBadge = p.status === "fresh"
-    ? `<span style="background:#dcfce7;color:#15803d;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Today</span>`
+    ? `<span style="background:${TODAY_BADGE_BG};color:${TODAY_BADGE_TEXT};border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Today</span>`
     : p.status === "standin"
-    ? `<span style="background:#fef3c7;color:#92400e;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Stand-in · ${p.daysSinceReport}d</span>`
+    ? `<span style="background:${STANDIN_BADGE_BG};color:${STANDIN_BADGE_TEXT};border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Stand-in · ${p.daysSinceReport}d</span>`
     : `<span style="background:#fee2e2;color:#991b1b;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Missing</span>`;
 
-  // Sales metrics grid
+  // Sales pipeline grid — pipeline_snapshot (typed) wins; fall back to salesMetrics array
   let salesGrid = "";
-  if (p.salesMetrics && p.salesMetrics.length > 0) {
-    const tiles = p.salesMetrics.map(m => `<div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;flex:1;min-width:80px;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div>`).join("");
+  if (p.pipeline_snapshot) {
+    salesGrid = pipelineGrid(p.pipeline_snapshot);
+  } else if (p.salesMetrics && p.salesMetrics.length > 0) {
+    const tiles = p.salesMetrics.map(m => `<div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;flex:1;min-width:80px;"><div style="font-size:20px;font-weight:500;color:${NAVY_BG};">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div>`).join("");
     salesGrid = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${tiles}</div>`;
   }
 
@@ -373,7 +454,7 @@ function pdfDeptSection(dept: DepartmentData, ctx: RenderContext): string {
   }
   const statusColor = dept.statusOk ? "#22c55e" : "#f59e0b";
   return `<div style="margin-bottom:24px;">
-  <div style="background:#0f172a;border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+  <div style="background:${NAVY_BG};border-radius:8px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <span style="font-size:14px;font-weight:500;color:#e2e8f0;">${dept.emoji} ${dept.name}</span>
     <span style="font-size:11px;font-weight:600;color:${statusColor};">${dept.statusLabel}</span>
   </div>
@@ -438,9 +519,9 @@ function emailPulse(data: AiSummaryData): string {
   );
   const rateBg = pct === 100 ? "#14532d" : "#78350f";
   const rateColor = pct === 100 ? "#86efac" : "#fde68a";
-  return `<tr><td style="background:#0f172a;padding:24px 28px 20px;">
-  <div style="font-size:11px;font-weight:700;color:#EF9F27;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">⚡ Today's Pulse</div>
-  <div style="font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6;margin-bottom:16px;">${data.todaysPulse ?? ""}</div>
+  return `<tr><td style="background:${NAVY_BG};padding:24px 28px 20px;">
+  <div style="font-size:11px;font-weight:700;color:${PULSE_LABEL_TEXT};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">⚡ Today's Pulse</div>
+  <div style="font-size:16px;font-weight:500;color:${PULSE_TEXT};line-height:1.6;margin-bottom:16px;">${data.todaysPulse ?? ""}</div>
   <table cellpadding="0" cellspacing="0"><tr>
     <td style="padding-right:6px;"><span style="display:inline-block;background:#14532d;color:#86efac;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">✓ ${fresh} submitted</span></td>
     ${missing > 0
@@ -489,18 +570,19 @@ function emailNotableProgress(data: AiSummaryData): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   const blocks = groups.map(g => `
-    ${g.department ? `<div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #bbf7d0;">${g.department}</div>` : ""}
+    ${g.department ? `<div style="font-size:10px;font-weight:700;color:${NOTABLE_DEPT_TEXT};text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid ${NOTABLE_BORDER};">${g.department}</div>` : ""}
     ${(g.items ?? []).map(item => `<div style="font-size:13px;color:#064e3b;line-height:1.65;margin-bottom:4px;"><span style="color:#16a34a;font-weight:600;margin-right:5px;">✓</span>${stripCheckmark(item)}</div>`).join("")}
     ${g.overflowNote ? `<div style="font-size:11px;color:#6b7280;font-style:italic;margin-top:4px;">${g.overflowNote}</div>` : ""}
   `).join("");
   return `<tr><td style="padding:16px 24px;border-bottom:1px solid #e2e8f0;">
-  <div style="font-size:11px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">🏆 Notable Progress</div>
-  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;">${blocks}</div>
+  <div style="font-size:11px;font-weight:700;color:${NOTABLE_DEPT_TEXT};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">🏆 Notable Progress</div>
+  <div style="background:${NOTABLE_BG};border:1px solid ${NOTABLE_BORDER};border-radius:10px;padding:14px 16px;">${blocks}</div>
 </td></tr>`;
 }
 
 function emailTaskRow(h: HighlightItem): string {
   const { clean, dueDate, pct } = extractDuePct(h.text);
+  const todayStr = new Date().toISOString().split("T")[0];
   let iconCell: string;
   if (h.type === "tomorrowfocus") {
     iconCell = `<td width="20" valign="top" style="padding-top:1px;font-size:13px;line-height:1.5;">📅</td>`;
@@ -511,13 +593,12 @@ function emailTaskRow(h: HighlightItem): string {
   } else if (h.taskEmoji) {
     iconCell = `<td width="20" valign="top" style="padding-top:1px;font-size:13px;line-height:1.5;">${h.taskEmoji}</td>`;
   } else {
-    iconCell = `<td width="20" valign="top" style="padding-top:5px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#378ADD;"></span></td>`;
+    iconCell = `<td width="20" valign="top" style="padding-top:5px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${BULLET_BLUE};"></span></td>`;
   }
-  const duePart = dueDate ? ` <span style="color:${dueDateColor(dueDate)};font-size:11px;">· due ${fmtMD(dueDate)}</span>` : "";
-  const pctPart = pct != null ? ` <span style="display:inline-block;background:#f1f5f9;color:#6b7280;border-radius:10px;padding:1px 7px;font-size:11px;">${pct}%</span>` : "";
+  const duePart = dueDate ? ` <span style="color:${getDueDateColor(dueDate, todayStr)};font-size:11px;">· due ${fmtMD(dueDate)}</span>` : "";
   const textColor = h.type === "tomorrowfocus" ? "#475569" : "#1e293b";
   return `<tr><td style="padding:2px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
-    ${iconCell}<td style="font-size:13px;color:${textColor};line-height:1.5;padding-left:4px;">${clean}${duePart}${pctPart}</td>
+    ${iconCell}<td style="font-size:13px;color:${textColor};line-height:1.5;padding-left:4px;">${clean}${duePart}${pctBadgeEmail(pct)}</td>
   </tr></table></td></tr>`;
 }
 
@@ -552,18 +633,20 @@ function emailPersonRow(p: PersonData, ctx: RenderContext): string {
   const href = reportHref(p.name, ctx);
   const viewLink = href ? `<a href="${href}" style="display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;text-decoration:none;">View Submitted Report →</a>` : "";
   const statusBadge = p.status === "fresh"
-    ? `<span style="display:inline-block;background:#dcfce7;color:#15803d;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Today</span>`
+    ? `<span style="display:inline-block;background:${TODAY_BADGE_BG};color:${TODAY_BADGE_TEXT};border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Today</span>`
     : p.status === "standin"
-    ? `<span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Stand-in · ${p.daysSinceReport}d</span>`
+    ? `<span style="display:inline-block;background:${STANDIN_BADGE_BG};color:${STANDIN_BADGE_TEXT};border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Stand-in · ${p.daysSinceReport}d</span>`
     : `<span style="display:inline-block;background:#fee2e2;color:#991b1b;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;">Missing</span>`;
 
-  // Sales metrics — 3-per-row table grid
+  // Sales pipeline grid — pipeline_snapshot (typed) wins; fall back to salesMetrics array
   let salesGrid = "";
-  if (p.salesMetrics && p.salesMetrics.length > 0) {
+  if (p.pipeline_snapshot) {
+    salesGrid = pipelineGridEmail(p.pipeline_snapshot);
+  } else if (p.salesMetrics && p.salesMetrics.length > 0) {
     let rows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      rows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
+      rows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:500;color:${NAVY_BG};">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
     }
     salesGrid = `<tr><td style="padding:0 0 12px;"><table cellpadding="0" cellspacing="0" width="100%">${rows}</table></td></tr>`;
   }
@@ -642,7 +725,7 @@ function emailDeptSection(dept: DepartmentData, ctx: RenderContext): string {
   }
   const statusColor = dept.statusOk ? "#22c55e" : "#f59e0b";
   return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:24px;">
-  <tr><td style="background:#0f172a;border-radius:8px 8px 0 0;padding:10px 16px;">
+  <tr><td style="background:${NAVY_BG};border-radius:8px 8px 0 0;padding:10px 16px;">
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
       <td style="font-size:14px;font-weight:500;color:#e2e8f0;">${dept.emoji} ${dept.name}</td>
       <td style="text-align:right;font-size:11px;font-weight:600;color:${statusColor};">${dept.statusLabel}</td>
@@ -669,7 +752,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <table cellpadding="0" cellspacing="0" width="100%" style="background:#f8fafc;">
 <tr><td style="padding:24px 16px;">
 <table cellpadding="0" cellspacing="0" width="620" align="center" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;max-width:100%;">
-  <tr><td style="background:#0f172a;padding:20px 28px 16px;">
+  <tr><td style="background:${NAVY_BG};padding:20px 28px 16px;">
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
       <td valign="top"><div style="font-size:18px;font-weight:700;color:#fff;">${orgName}</div><div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;text-transform:uppercase;letter-spacing:0.08em;">Executive Summary</div></td>
       <td style="text-align:right;vertical-align:top;"><div style="font-size:12px;color:rgba(255,255,255,0.6);">${formattedDate}</div></td>
