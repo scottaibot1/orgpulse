@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
-export async function POST(request: NextRequest) {
-  // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+// ─── Background work — runs after 200 is returned ───────────────────────────
+
+async function runCronWork(): Promise<void> {
+  console.log(`[Cron] Background work started at ${new Date().toISOString()}`);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  // Extend window by one extra day to catch evening US submissions stored as next UTC day
   const dayAfterTomorrow = new Date(tomorrow);
   dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // ── Part 2: Cleanup — delete ParsedReports older than 30 days ──
+  // ── Cleanup — delete ParsedReports older than 30 days ──
   try {
     const deleted = await prisma.parsedReport.deleteMany({
       where: { date: { lt: thirtyDaysAgo } },
@@ -35,19 +33,16 @@ export async function POST(request: NextRequest) {
     console.error("[Cron] Cleanup error:", e);
   }
 
-  // Get all orgs with settings
+  // Fetch all orgs
   const orgs = await prisma.organization.findMany({
-    select: {
-      id: true,
-      name: true,
-      ownerEmail: true,
-      workspaceSettings: true,
-    },
+    select: { id: true, name: true, ownerEmail: true, workspaceSettings: true },
   });
+  console.log(`[Cron] Found ${orgs.length} org(s) to process`);
 
   const results: { orgId: string; status: string; error?: string }[] = [];
 
   for (const org of orgs) {
+    console.log(`[Cron] Processing org: ${org.name} (${org.id})`);
     try {
       const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
       const apiKey = org.workspaceSettings?.anthropicApiKey ?? null;
@@ -58,13 +53,8 @@ export async function POST(request: NextRequest) {
       const reportingWindowStart = lastGeneratedAt ? lastGeneratedAt.toISOString().split("T")[0] : null;
 
       // Get active users per scope — include schedule fields
-      const userWhere: Record<string, unknown> = {
-        orgId: org.id,
-        isReportingActive: true,
-      };
-      if (scope === "leads_only") {
-        userWhere.isLead = true;
-      }
+      const userWhere: Record<string, unknown> = { orgId: org.id, isReportingActive: true };
+      if (scope === "leads_only") userWhere.isLead = true;
 
       const activeUsers = await prisma.user.findMany({
         where: userWhere,
@@ -82,6 +72,7 @@ export async function POST(request: NextRequest) {
           },
         },
       });
+      console.log(`[Cron] ${org.name}: ${activeUsers.length} active user(s)`);
 
       if (activeUsers.length === 0) {
         results.push({ orgId: org.id, status: "skipped_no_users" });
@@ -90,28 +81,17 @@ export async function POST(request: NextRequest) {
 
       // Split users into due-today vs not-scheduled-today
       const dueTodayUsers = activeUsers.filter((u) =>
-        isPersonDueToday(
-          u.reportCadence,
-          (u.reportDueDays as number[]) ?? [5],
-          u.reportBiweeklyWeek,
-          today,
-          biweeklyStartDate
-        )
+        isPersonDueToday(u.reportCadence, (u.reportDueDays as number[]) ?? [5], u.reportBiweeklyWeek, today, biweeklyStartDate)
       );
       const notScheduledTodayUsers = activeUsers.filter((u) =>
-        !isPersonDueToday(
-          u.reportCadence,
-          (u.reportDueDays as number[]) ?? [5],
-          u.reportBiweeklyWeek,
-          today,
-          biweeklyStartDate
-        )
+        !isPersonDueToday(u.reportCadence, (u.reportDueDays as number[]) ?? [5], u.reportBiweeklyWeek, today, biweeklyStartDate)
       );
+      console.log(`[Cron] ${org.name}: ${dueTodayUsers.length} expected today, ${notScheduledTodayUsers.length} not scheduled`);
 
-      // Only expected users are included in the report — non-expected users are excluded entirely
       const expectedUserIds = dueTodayUsers.map((u) => u.id);
 
       // Get today's parsed reports for expected users only
+      console.log(`[Cron] ${org.name}: Fetching today's reports…`);
       const todayReports = await prisma.parsedReport.findMany({
         where: {
           userId: { in: expectedUserIds },
@@ -121,21 +101,17 @@ export async function POST(request: NextRequest) {
       });
 
       const todayReportByUser = new Map(todayReports.map((r) => [r.userId, r]));
+      console.log(`[Cron] ${org.name}: ${todayReports.length} report(s) received today`);
 
       // Get canonical narratives for expected users only
-      const narratives = await prisma.canonicalNarrative.findMany({
-        where: { userId: { in: expectedUserIds } },
-      });
+      const narratives = await prisma.canonicalNarrative.findMany({ where: { userId: { in: expectedUserIds } } });
       const narrativeByUser = new Map(narratives.map((n) => [n.userId, n]));
 
       // Stand-ins only for expected users who didn't submit today
       const expectedWithoutTodayReport = expectedUserIds.filter((id) => !todayReportByUser.has(id));
       const standInReports = expectedWithoutTodayReport.length > 0
         ? await prisma.parsedReport.findMany({
-            where: {
-              userId: { in: expectedWithoutTodayReport },
-              date: { lt: today, gte: thirtyDaysAgo },
-            },
+            where: { userId: { in: expectedWithoutTodayReport }, date: { lt: today, gte: thirtyDaysAgo } },
             orderBy: { date: "desc" },
             distinct: ["userId"],
             select: { userId: true, aiSummary: true, structuredData: true, notes: true, blockers: true, totalHours: true, date: true },
@@ -147,16 +123,13 @@ export async function POST(request: NextRequest) {
       // Build completeness scorecard — only expected users count
       const standInSummaries: { name: string; daysSince: number }[] = [];
       let freshCount = 0;
-
       for (const u of dueTodayUsers) {
         if (todayReportByUser.has(u.id)) {
           freshCount++;
         } else {
           const standIn = standInByUser.get(u.id);
           if (standIn) {
-            const daysSince = Math.floor(
-              (today.getTime() - new Date(standIn.date).getTime()) / (1000 * 60 * 60 * 24)
-            );
+            const daysSince = Math.floor((today.getTime() - new Date(standIn.date).getTime()) / (1000 * 60 * 60 * 24));
             standInSummaries.push({ name: u.name, daysSince });
           } else {
             standInSummaries.push({ name: u.name, daysSince: -1 });
@@ -168,24 +141,18 @@ export async function POST(request: NextRequest) {
         totalExpected: dueTodayUsers.length,
         freshToday: freshCount,
         standIns: standInSummaries,
-        percentage: dueTodayUsers.length > 0
-          ? Math.round((freshCount / dueTodayUsers.length) * 100)
-          : 100,
+        percentage: dueTodayUsers.length > 0 ? Math.round((freshCount / dueTodayUsers.length) * 100) : 100,
         notScheduledToday: notScheduledTodayUsers.map((u) => ({ name: u.name })),
       };
 
       // Departments where ZERO expected members exist today → show as placeholder
-      const expectedDeptNames = new Set(
-        dueTodayUsers.map((u) => u.departmentMemberships[0]?.department?.name).filter(Boolean)
-      );
+      const expectedDeptNames = new Set(dueTodayUsers.map((u) => u.departmentMemberships[0]?.department?.name).filter(Boolean));
       const notExpectedDeptSchedules = new Map<string, Set<string>>();
       for (const u of notScheduledTodayUsers) {
         const deptName = u.departmentMemberships[0]?.department?.name;
         if (!deptName || expectedDeptNames.has(deptName)) continue;
         if (!notExpectedDeptSchedules.has(deptName)) notExpectedDeptSchedules.set(deptName, new Set());
-        notExpectedDeptSchedules.get(deptName)!.add(
-          buildScheduleLabel(u.reportCadence, (u.reportDueDays as number[]) ?? [5])
-        );
+        notExpectedDeptSchedules.get(deptName)!.add(buildScheduleLabel(u.reportCadence, (u.reportDueDays as number[]) ?? [5]));
       }
       const notExpectedDepartments = Array.from(notExpectedDeptSchedules.entries()).map(([name, labels]) => ({
         name,
@@ -198,17 +165,11 @@ export async function POST(request: NextRequest) {
         const todayReport = todayReportByUser.get(u.id);
         const standIn = standInByUser.get(u.id);
         const activeReport = todayReport ?? standIn;
-
         const isStandIn = !todayReport && !!standIn;
-        const reportDate = activeReport
-          ? new Date(activeReport.date).toISOString().split("T")[0]
-          : "never";
-        const daysSinceReport = activeReport
-          ? Math.floor((today.getTime() - new Date(activeReport.date).getTime()) / (1000 * 60 * 60 * 24))
-          : -1;
+        const reportDate = activeReport ? new Date(activeReport.date).toISOString().split("T")[0] : "never";
+        const daysSinceReport = activeReport ? Math.floor((today.getTime() - new Date(activeReport.date).getTime()) / (1000 * 60 * 60 * 24)) : -1;
 
         let builtNarrative = narrative?.currentNarrative ?? activeReport?.aiSummary ?? "No report data available.";
-
         if (autoReportDetailLevel >= 3 && activeReport?.structuredData) {
           const sd = activeReport.structuredData as {
             summary?: string;
@@ -264,6 +225,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Generate executive summary
+      console.log(`[Cron] ${org.name}: Calling AI to generate summary…`);
       const summaryText = await generateExecutiveSummaryV2({
         apiKey,
         orgName: org.name,
@@ -277,6 +239,7 @@ export async function POST(request: NextRequest) {
         reportingWindowStart,
         notExpectedDepartments,
       });
+      console.log(`[Cron] ${org.name}: AI summary generated (${summaryText.length} chars)`);
 
       // Save daily summary
       const savedSummary = await prisma.dailySummary.create({
@@ -289,14 +252,15 @@ export async function POST(request: NextRequest) {
           alertCount: recentAlerts.length,
         },
       });
+      console.log(`[Cron] ${org.name}: Summary saved (id=${savedSummary.id})`);
 
-      // Update lastReportGeneratedAt so the next run knows its window start
+      // Update lastReportGeneratedAt
       await prisma.workspaceSettings.updateMany({
         where: { orgId: org.id },
         data: { lastReportGeneratedAt: new Date() },
       });
 
-      // Prune to keep only the 30 most recently generated summaries for this org
+      // Prune to keep only the 30 most recently generated summaries
       const oldestSummaries = await prisma.dailySummary.findMany({
         where: { orgId: org.id },
         orderBy: { createdAt: "desc" },
@@ -307,10 +271,8 @@ export async function POST(request: NextRequest) {
         await prisma.dailySummary.deleteMany({ where: { id: { in: oldestSummaries.map((s) => s.id) } } });
       }
 
-      // Create missing submission alerts — only for users who are due today and never submitted
-      const neverSubmitted = dueTodayUsers.filter(
-        (u) => !todayReportByUser.has(u.id) && !standInByUser.has(u.id)
-      );
+      // Create missing submission alerts for users who never submitted
+      const neverSubmitted = dueTodayUsers.filter((u) => !todayReportByUser.has(u.id) && !standInByUser.has(u.id));
       if (neverSubmitted.length > 0) {
         await prisma.alert.createMany({
           data: neverSubmitted.map((u) => ({
@@ -327,6 +289,7 @@ export async function POST(request: NextRequest) {
       // Email the summary to the workspace owner
       if (org.ownerEmail && process.env.RESEND_API_KEY) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
+        console.log(`[Cron] ${org.name}: Sending email to ${org.ownerEmail}…`);
         sendSummaryEmail({
           toEmail: org.ownerEmail,
           orgName: org.name,
@@ -337,24 +300,53 @@ export async function POST(request: NextRequest) {
           missingSubmissions: dueTodayUsers.length - freshCount,
           markdown: summaryText,
           appUrl,
-        }).catch((e) => console.error(`Email failed for org ${org.id}:`, e));
+        }).then(() => {
+          console.log(`[Cron] ${org.name}: Email sent to ${org.ownerEmail}`);
+        }).catch((e) => console.error(`[Cron] ${org.name}: Email failed for ${org.ownerEmail}:`, e));
+      } else {
+        if (!org.ownerEmail) console.warn(`[Cron] ${org.name}: No ownerEmail — skipping email`);
+        if (!process.env.RESEND_API_KEY) console.warn(`[Cron] ${org.name}: RESEND_API_KEY not set — skipping email`);
       }
 
       results.push({ orgId: org.id, status: "ok" });
+      console.log(`[Cron] ${org.name}: Done ✓`);
     } catch (err) {
-      console.error(`Cron error for org ${org.id}:`, err);
-      results.push({
-        orgId: org.id,
-        status: "error",
-        error: err instanceof Error ? err.message : String(err),
-      });
+      console.error(`[Cron] Error for org ${org.id} (${org.name}):`, err);
+      results.push({ orgId: org.id, status: "error", error: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  return NextResponse.json({ results });
+  console.log(`[Cron] All orgs processed. Results:`, JSON.stringify(results));
+}
+
+// ─── Route handlers ───────────────────────────────────────────────────────────
+
+function isAuthorized(request: NextRequest): boolean {
+  const authHeader = request.headers.get("authorization");
+  return authHeader === `Bearer ${process.env.CRON_SECRET}`;
+}
+
+export async function POST(request: NextRequest) {
+  console.log(`[Cron] Handler reached at ${new Date().toISOString()}`);
+
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  waitUntil(runCronWork());
+
+  return NextResponse.json({ ok: true, startedAt: new Date().toISOString() });
 }
 
 export async function GET(request: NextRequest) {
-  // Allow GET for Vercel cron jobs which use GET
-  return POST(request);
+  // Vercel cron jobs invoke via GET
+  console.log(`[Cron] Handler reached (GET) at ${new Date().toISOString()}`);
+
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  waitUntil(runCronWork());
+
+  return NextResponse.json({ ok: true, startedAt: new Date().toISOString() });
 }

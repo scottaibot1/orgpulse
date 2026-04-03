@@ -85,7 +85,7 @@ Output ONLY a valid JSON object. First character must be { and last must be }. N
           "timeAllocation": [ { "label": string, "hours": number, "percent": number } ],
           "timeAllocationEstimated": boolean,
           "highlights": [
-            { "type": "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker", "text": string, "subcategory": string (optional) }
+            { "type": "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker", "text": string, "subcategory": string (optional), "taskEmoji": string (optional — see EMOJI THRESHOLD rule) }
           ],
           "overflowNote": string (optional — only present when more than 20 ontack items exist)
         }
@@ -206,6 +206,72 @@ If status "missing": exactly one highlight {"type":"critical","text":"No report 
 At level 5: every specific number, client name, project name, deadline, and measurable outcome must appear in highlights. Nothing omitted. Do not summarize or combine tasks.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EMOJI THRESHOLD — IN PROGRESS AND AT RISK TASK ICONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For each person, count their total ontack + atrisk highlights BEFORE applying any overflow truncation.
+
+If the count is 7 or fewer: do NOT set taskEmoji on any highlight. Leave taskEmoji absent. The renderer will use its default arrow icon.
+
+If the count is 8 or more: set taskEmoji on EVERY ontack and atrisk highlight for that person using ONLY this defined list — choose the single best fit:
+- 🔧 maintenance, repairs, technical work, installation, physical assembly
+- 📞 calls, follow-up, outreach, communication, phone, email sequences
+- 📋 documentation, reporting, forms, tracking, filing, audits, compliance
+- 💰 revenue, financial, pricing, payments, payroll, quotes, bookings, weddings
+- 🤝 partnerships, vendor relations, approvals, meetings, coordination
+- 🏗️ construction, facilities, physical property, building work
+- 🔄 recurring, ongoing, monitoring, weekly tasks, standing reviews
+- ⏳ waiting on someone else, pending external input, awaiting approval
+- 📊 analysis, research, data, spreadsheets, competitor review
+- 🎨 creative, design, branding, content, video, photography
+- 👥 staff, HR, hiring, training, team management, raises, vacation
+- 📦 inventory, purchasing, supplies, logistics, delivery
+
+If genuinely uncertain, default to 📋.
+NEVER set taskEmoji on completed, standout, blocker, or critical highlights — only ontack and atrisk.
+Do NOT apply this rule at detail level 1.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELIVERY DATES AND PERCENTAGES — MANDATORY INLINE DISPLAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DUE DATE EXTRACTION (Fix 3):
+Recognize ALL of these column headers as the task due date: "Estimated Deliv", "Estimated Delivery", "Estimated Resolution Date", "Est. Delivery", "Target Date", "Due Date", "Delivery Date", "Target Completion", or any column header implying a completion deadline.
+- Extract this date for every task that has it.
+- Display inline in every ontack, atrisk, blocked, and not-started highlight as " · due M/D/YY" (e.g. " · due 4/15/26").
+- This date is the PRIMARY urgency sort signal — always apply RULE 4 urgency sort using it.
+- Never ignore a date column. If you see a date column in a table, extract it for every row.
+
+LAST MODIFIED — INTERNAL REASONING ONLY (Fix 4):
+Read the "Last Modified" or "Last Modification" field for every task. Do NOT display it in the report.
+Use it internally:
+- If a task has a past due date but was modified within 7 days: treat as actively being worked. Do NOT flag as overdue or abandoned.
+- If a task has not been modified in over 30 days and is below 50% complete: append " · stale" to the task text as a subtle indicator.
+
+PERCENTAGE COMPLETE — SHOW ON EVERY TASK (Fix 5):
+Display the completion percentage as an inline badge on EVERY task that has one — ontack, atrisk, blocked, overdue, and not-started. Example: "Vegan and vegetarian menu · due 4/1/26 · 50%".
+- Only completed tasks at 100% are exempt from showing a percentage.
+- Never omit a percentage that exists in the source data, regardless of which section the task appears in.
+- Format: append " · N%" after the due date (or at the end if no due date).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TABULAR DATA PARSING — LANGUAGE AND FIELD AWARE (Fix 6)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When source data contains a structured table with columns (start date, estimated delivery, last modified, status, percentage, observations):
+- Parse every row as a structured record — each field extracted independently.
+- Use the OBSERVATIONS and BLOCKERS column as the primary task description, not just the task name.
+- Map status values in any language before categorizing:
+  * "Terminado", "Completado", "Finalizado", or pctComplete === 100 → ALWAYS "completed"
+  * "En Proceso", "Proceso", "En Progreso" → "ontack"
+  * "No empezado", "No Iniciado", "Sin Iniciar" → "ontack" with low percentage
+  * "Bloqueado", "En Espera" → "blocker"
+  * "En Riesgo", "Atrasado", "Retrasado" → "atrisk"
+- NEVER place a "Terminado" or 100%-complete task in any category other than "completed".
+- NEVER place a task in "ontack" solely because it appeared in an "In Progress" section of the source — always verify against status field and percentage first.
+- A task that says "Proceso 80%" and has a near due date should be "ontack" with due date and percentage shown.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LARGE LIST HANDLING — APPLIES AT LEVELS 2–5
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -306,3 +372,7 @@ CRITICAL RULES — VIOLATION = INVALID OUTPUT
 22. Urgency sort order within each category: overdue → due ≤7d → due ≤30d → no date → future date.
 23. Every entry in notExpectedDepartments MUST appear in the departments output with notExpectedToday: true and people: []. Never omit them.
 24. People and departments not in the input must never be invented or inferred. Only output what the data contains.
+25. taskEmoji must only be set on ontack and atrisk highlights, and only when the person has 8+ ontack+atrisk items total. Never set taskEmoji on completed, standout, blocker, or critical. Never use an emoji not in the defined list.
+26. Every ontack, atrisk, and blocked highlight must include " · due M/D/YY" if any deadline column exists for that task in the source data. Never omit a date that exists.
+27. Every highlight (except completed at 100%) must include " · N%" if a percentage exists for that task in the source data. Never omit a percentage that exists.
+28. "Last Modified" must never appear in rendered text. It is an internal reasoning signal only.

@@ -34,7 +34,7 @@ RULE 6 - OUTPUT FORMAT. Return ONLY a valid JSON object. The first character mus
   "activities": [{ "startTime": string, "endTime": string, "durationHours": number, "description": string }],
   "totalHoursWorked": number or 0 if not found,
   "timeAllocation": [{ "taskName": string, "hours": number, "percentage": number }],
-  "projects": [{ "projectName": string, "startDate": string, "estimatedDelivery": string, "lastModified": string, "status": string, "percentageComplete": number, "observationsAndBlockers": string }],
+  "projects": [{ "projectName": string, "startDate": string, "estimatedDelivery": "YYYY-MM-DD extracted from columns named 'Estimated Deliv', 'Estimated Delivery', 'Estimated Resolution Date', 'Est. Delivery', 'Target Date', 'Due Date', 'Delivery Date', 'Target Completion', or any column implying a completion deadline — empty string if none", "lastModified": string, "status": string, "percentageComplete": number, "observationsAndBlockers": string }],
   "risksAndEscalations": [string],
   "executiveSummary": string
 }`;

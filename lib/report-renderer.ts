@@ -4,6 +4,7 @@ export interface HighlightItem {
   type: "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker";
   text: string;
   subcategory?: string; // Optional group label rendered as a divider above consecutive items sharing this label
+  taskEmoji?: string;   // Per-task emoji override for ontack/atrisk items (used when person has 8+ in-progress tasks)
 }
 
 export interface TimeAllocationItem {
@@ -169,8 +170,9 @@ function groupedHighlightsPdf(highlights: HighlightItem[]): string {
       out += `<div style="font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;margin:6px 0 3px;padding-bottom:2px;border-bottom:1px solid #e2e8f0;">${h.subcategory}</div>`;
       lastSubcategory = h.subcategory;
     }
+    const icon = (h.taskEmoji && (h.type === "ontack" || h.type === "atrisk")) ? h.taskEmoji : s.icon;
     out += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 4px 4px 0;">
-      <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${s.icon}</span>
+      <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${icon}</span>
       <span style="font-size:12px;color:${s.color};line-height:1.5;">${formatHighlightText(h.text)}</span>
     </div>`;
   }
@@ -196,9 +198,10 @@ function groupedHighlightsEmail(highlights: HighlightItem[]): string {
       out += `<tr><td style="padding:5px 0 2px;font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e2e8f0;">${h.subcategory}</td></tr>`;
       lastSubcategory = h.subcategory;
     }
+    const emailIcon = (h.taskEmoji && (h.type === "ontack" || h.type === "atrisk")) ? h.taskEmoji : s.icon;
     out += `<tr><td style="padding:3px 0;">
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
-        <td width="24" valign="top" style="padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${s.icon}</td>
+        <td width="24" valign="top" style="padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${emailIcon}</td>
         <td style="padding:5px 9px 5px 6px;background:${s.bg};font-size:12px;color:${s.color};line-height:1.5;">${formatHighlightText(h.text)}</td>
       </tr></table>
     </td></tr>`;
