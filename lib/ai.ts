@@ -673,6 +673,9 @@ export async function generateExecutiveSummaryV2(context: {
   notExpectedDepartments?: { name: string; scheduleLabel: string }[]; // Departments with no expected members today
 }): Promise<string> {
   const { apiKey, ...rest } = context;
-  const prompt = loadPrompt("executive-summary-v2.txt");
+  const rawPrompt = loadPrompt("executive-summary-v2.txt");
+  const now = new Date();
+  const todayFormatted = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const prompt = rawPrompt.replace("{{TODAY_DATE}}", `Today's date is ${todayFormatted}.`);
   return callClaude(prompt, JSON.stringify(rest), "claude-sonnet-4-20250514", apiKey, 8192);
 }

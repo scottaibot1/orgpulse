@@ -1,7 +1,7 @@
 // Shared renderer for executive summary JSON → premium PDF HTML and email HTML.
 
 export interface HighlightItem {
-  type: "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker";
+  type: "critical" | "atrisk" | "ontack" | "completed" | "standout" | "blocker" | "tomorrowfocus";
   text: string;
   subcategory?: string; // Optional group label rendered as a divider above consecutive items sharing this label
   taskEmoji?: string;   // Per-task emoji override for ontack/atrisk items (used when person has 8+ in-progress tasks)
@@ -134,6 +134,7 @@ const HIGHLIGHT_MAP: Record<string, HighlightStyle> = {
   atrisk:    { icon: "⚠️", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", categoryLabel: "At Risk" },
   blocker:   { icon: "🚫", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Blocked" },
   critical:  { icon: "🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Critical" },
+  tomorrowfocus: { icon: "📅", color: "#0f766e", bg: "#f0fdfa", border: "#5eead4", categoryLabel: "Tomorrow's Focus" },
 };
 
 function personInitial(name: string) {
