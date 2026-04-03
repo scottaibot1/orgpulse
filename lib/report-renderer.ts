@@ -52,9 +52,9 @@ export interface NotableProgressGroup {
 
 export interface AiSummaryData {
   todaysPulse: string;
-  organizationPulse: string;
+  organizationPulse?: string; // legacy — no longer generated; kept for backward compat with old saved summaries
   attentionItems?: AttentionItem[];
-  criticalAlerts: { type: "blocker" | "atrisk"; department?: string; text: string }[];
+  criticalAlerts?: { type: "blocker" | "atrisk"; department?: string; text: string }[]; // legacy — merged into attentionItems in new reports
   // notableProgress can be the new grouped format or legacy flat string[]
   notableProgress: NotableProgressGroup[] | string[];
   completenessScore: {
@@ -337,54 +337,48 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   const pct = cs.percentage ?? 0;
   const missing = cs.missing ?? [];
 
-  // Attention items — grouped by department
-  const attentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
+  // What Needs Attention — attention items + legacy criticalAlerts merged together
+  const allAttentionItems = data.attentionItems ?? [];
+  // Build legacy critical alert items as attention items for backward compat
+  const legacyCriticalItems: AttentionItem[] = (data.criticalAlerts ?? []).map((a) => ({
+    emoji: a.type === "blocker" ? "🚨" : "⚠️",
+    department: a.department ?? "General",
+    description: a.text,
+    who: a.department ?? "",
+    action: "Review and address",
+  }));
+  const combinedAttentionItems = [...allAttentionItems, ...legacyCriticalItems];
+
+  const attentionSection = (() => {
+    if (combinedAttentionItems.length === 0) {
+      return `<div style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:12px 40px;">
+        <div style="font-size:12px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">🟢 What Needs Attention</div>
+        <div style="font-size:13px;color:#166534;">No items requiring executive action today.</div>
+      </div>`;
+    }
     const byDept = new Map<string, AttentionItem[]>();
-    for (const item of data.attentionItems) {
+    for (const item of combinedAttentionItems) {
       const dept = item.department || "General";
       if (!byDept.has(dept)) byDept.set(dept, []);
       byDept.get(dept)!.push(item);
     }
     const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
-      ${dept ? `<div style="font-size:10px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;margin-top:10px;padding-bottom:3px;border-bottom:1px solid #fed7aa;">${dept}</div>` : ""}
+      ${dept && dept !== "General" ? `<div style="font-size:10px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;margin-top:10px;padding-bottom:3px;border-bottom:1px solid #fed7aa;">${dept}</div>` : ""}
       ${items.map((item) => `
         <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid #f97316;">
           <span style="font-size:16px;flex-shrink:0;line-height:1.3;">${item.emoji}</span>
           <div style="flex:1;min-width:0;">
             <span style="font-size:13px;font-weight:700;color:#7c2d12;">${item.description}</span>
-            <span style="font-size:13px;color:#92400e;"> (${item.who})</span>
-            <span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>
+            ${item.who ? `<span style="font-size:13px;color:#92400e;"> (${item.who})</span>` : ""}
+            ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
           </div>
         </div>`).join("")}
     `).join("");
     return `<div style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 40px;">
-      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">🔥 What Needs Attention Today 🚨</div>
+      <div style="font-size:12px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">🔥 What Needs Attention</div>
       ${deptBlocks}
     </div>`;
-  })() : "";
-
-  // Critical alerts — grouped by department (PDF)
-  const criticalAlertsPdf = data.criticalAlerts ?? [];
-  const alertsSection = criticalAlertsPdf.length > 0 ? (() => {
-    const byDept = new Map<string, typeof criticalAlertsPdf>();
-    for (const a of criticalAlertsPdf) {
-      const dept = a.department || "General";
-      if (!byDept.has(dept)) byDept.set(dept, []);
-      byDept.get(dept)!.push(a);
-    }
-    const deptBlocks = Array.from(byDept.entries()).map(([dept, alerts]) => `
-      ${dept !== "General" ? `<div style="font-size:10px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #fca5a5;">${dept}</div>` : ""}
-      ${alerts.map((a) => `
-        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:7px 11px;background:#fff;border-radius:6px;border-left:3px solid ${a.type === "blocker" ? "#dc2626" : "#f59e0b"};">
-          <span style="font-size:12px;">${a.type === "blocker" ? "🚫" : "⚠️"}</span>
-          <span style="font-size:12px;color:#7f1d1d;line-height:1.5;">${a.text}</span>
-        </div>`).join("")}
-    `).join("");
-    return `<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:15px 18px;margin-bottom:20px;">
-      <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🚨 Critical Alerts</div>
-      ${deptBlocks}
-    </div>`;
-  })() : "";
+  })();
 
   // Notable progress — grouped by department
   const progressSection = progressGroups.length > 0 ? (() => {
@@ -445,11 +439,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
   ${attentionSection}
 
   <div style="padding:26px 40px;">
-    <div style="font-size:13px;line-height:1.8;color:#334155;margin-bottom:22px;padding:15px 18px;background:#f8fafc;border-radius:8px;border-left:4px solid #6366f1;">
-      ${data.organizationPulse}
-    </div>
-
-    ${alertsSection}
     ${progressSection}
 
     ${(data.departments ?? []).map(pdfDeptSection).join("")}
@@ -583,60 +572,49 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const pct = cs.percentage ?? 0;
   const missingCount = (cs.missing ?? []).length;
 
-  // Attention items — grouped by department
-  const emailAttentionSection = data.attentionItems && data.attentionItems.length > 0 ? (() => {
+  // What Needs Attention — attention items + legacy criticalAlerts merged together (email)
+  const emailAllAttentionItems = data.attentionItems ?? [];
+  const emailLegacyCriticalItems: AttentionItem[] = (data.criticalAlerts ?? []).map((a) => ({
+    emoji: a.type === "blocker" ? "🚨" : "⚠️",
+    department: a.department ?? "General",
+    description: a.text,
+    who: a.department ?? "",
+    action: "Review and address",
+  }));
+  const emailCombinedAttentionItems = [...emailAllAttentionItems, ...emailLegacyCriticalItems];
+
+  const emailAttentionSection = (() => {
+    if (emailCombinedAttentionItems.length === 0) {
+      return `<tr><td style="background:#f0fdf4;border-bottom:2px solid #bbf7d0;padding:10px 24px;">
+        <span style="font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;letter-spacing:0.08em;">🟢 What Needs Attention — </span>
+        <span style="font-size:12px;color:#166534;">No items requiring executive action today.</span>
+      </td></tr>`;
+    }
     const byDept = new Map<string, AttentionItem[]>();
-    for (const item of data.attentionItems) {
+    for (const item of emailCombinedAttentionItems) {
       const dept = item.department || "General";
       if (!byDept.has(dept)) byDept.set(dept, []);
       byDept.get(dept)!.push(item);
     }
     const deptBlocks = Array.from(byDept.entries()).map(([dept, items]) => `
-      ${dept !== "General" ? `<tr><td style="padding:8px 0 4px;font-size:9px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #fed7aa;">${dept}</td></tr>` : ""}
+      ${dept && dept !== "General" ? `<tr><td style="padding:8px 0 4px;font-size:9px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #fed7aa;">${dept}</td></tr>` : ""}
       ${items.map((item) => `
         <tr><td style="padding:4px 0;">
           <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:4px;"><tr>
             <td style="width:26px;padding:8px 4px 8px 10px;background:#fff;border-left:4px solid #f97316;vertical-align:top;font-size:14px;">${item.emoji}</td>
             <td style="padding:8px 12px;background:#fff;vertical-align:top;">
               <span style="font-size:12px;font-weight:700;color:#7c2d12;">${item.description}</span>
-              <span style="font-size:12px;color:#92400e;"> (${item.who})</span>
-              <span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>
+              ${item.who ? `<span style="font-size:12px;color:#92400e;"> (${item.who})</span>` : ""}
+              ${item.action && item.action !== "Review and address" ? `<span style="font-size:12px;color:#b45309;font-style:italic;"> — ${item.action}</span>` : ""}
             </td>
           </tr></table>
         </td></tr>`).join("")}
     `).join("");
     return `<tr><td style="background:#fff7ed;border-bottom:2px solid #fed7aa;padding:16px 24px;">
-      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 What Needs Attention Today 🚨</div>
+      <div style="font-size:11px;font-weight:800;color:#9a3412;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">🔥 What Needs Attention</div>
       <table cellpadding="0" cellspacing="0" width="100%">${deptBlocks}</table>
     </td></tr>`;
-  })() : "";
-
-  // Critical alerts — grouped by department (email)
-  const criticalAlertsEmail = data.criticalAlerts ?? [];
-  const alertsSection = criticalAlertsEmail.length > 0 ? (() => {
-    const byDept = new Map<string, typeof criticalAlertsEmail>();
-    for (const a of criticalAlertsEmail) {
-      const dept = a.department || "General";
-      if (!byDept.has(dept)) byDept.set(dept, []);
-      byDept.get(dept)!.push(a);
-    }
-    const deptBlocks = Array.from(byDept.entries()).map(([dept, alerts]) => `
-      ${dept !== "General" ? `<tr><td style="padding:6px 0 3px;font-size:9px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.06em;">${dept}</td></tr>` : ""}
-      ${alerts.map((a) => `
-        <tr><td style="padding:2px 0;">
-          <table cellpadding="0" cellspacing="0" width="100%"><tr>
-            <td style="width:20px;padding:6px 6px 6px 10px;background:#fff;border-left:3px solid ${a.type === "blocker" ? "#dc2626" : "#f59e0b"};font-size:12px;vertical-align:top;">${a.type === "blocker" ? "🚫" : "⚠️"}</td>
-            <td style="padding:6px 10px;background:#fff;font-size:12px;color:#7f1d1d;line-height:1.5;">${a.text}</td>
-          </tr></table>
-        </td></tr>`).join("")}
-    `).join("");
-    return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:20px;background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:14px 16px;">
-        <div style="font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🚨 Critical Alerts</div>
-        <table cellpadding="0" cellspacing="0" width="100%">${deptBlocks}</table>
-      </td></tr>
-    </table>`;
-  })() : "";
+  })();
 
   // Notable progress — grouped by department
   const progressSection = progressGroups.length > 0 ? (() => {
@@ -699,14 +677,6 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   <!-- BODY -->
   <tr><td style="padding:22px 24px;">
 
-    <!-- ORG PULSE -->
-    <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:18px;"><tr>
-      <td style="padding:13px 16px;background:#f8fafc;border-radius:8px;border-left:4px solid #6366f1;font-size:13px;color:#334155;line-height:1.75;">
-        ${data.organizationPulse}
-      </td>
-    </tr></table>
-
-    ${alertsSection}
     ${progressSection}
 
     ${(data.departments ?? []).map(makeEmailDeptSection(ctx)).join("")}
