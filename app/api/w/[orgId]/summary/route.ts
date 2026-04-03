@@ -142,7 +142,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
       : Promise.resolve([]),
     prisma.canonicalNarrative.findMany({ where: { userId: { in: userIds } } }),
     prisma.alert.findMany({
-      where: { orgId, isRead: false, OR: [{ userId: null }, { user: { isReportingActive: true } }] },
+      where: { orgId, isRead: false, user: { isReportingActive: true } },
       select: { message: true },
       orderBy: { createdAt: "desc" },
       take: 10,
