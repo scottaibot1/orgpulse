@@ -85,11 +85,29 @@ export interface ExtractedReportData {
 
 // ─── Adapt VisionParsedReport → ExtractedReportData ──────────────────────────
 
-function mapProjectStatus(s: string): ExtractedReportData["tasks"][0]["status"] {
-  const l = s.toLowerCase();
-  if (l.includes("block") || l.includes("wait") || l.includes("authoriz") || l.includes("pending") || l.includes("on hold")) return "blocked";
+function mapProjectStatus(s: string, pctComplete?: number | null): ExtractedReportData["tasks"][0]["status"] {
+  // 100% complete always wins — regardless of any status label or language
+  if (pctComplete === 100) return "complete";
+
+  const l = s.toLowerCase().trim();
+
+  // Spanish / multilingual completion terms
+  if (l.includes("terminado") || l.includes("completado") || l.includes("finalizado") || l.includes("concluido")) return "complete";
+  // Spanish in-progress terms
+  if (l.includes("proceso") || l.includes("en progreso") || l.includes("en avance")) return "on_track";
+  // Spanish blocked/waiting
+  if (l.includes("bloqueado") || l.includes("en espera") || l.includes("detenido")) return "blocked";
+  // Spanish at-risk
+  if (l.includes("en riesgo") || l.includes("atrasado") || l.includes("retrasado")) return "at_risk";
+  // Spanish not started — treat as on_track with 0%
+  if (l.includes("no empezado") || l.includes("no iniciado") || l.includes("sin iniciar")) return "on_track";
+
+  // English patterns
+  if (l.includes("block") || l.includes("wait") || l.includes("authoriz") || l.includes("on hold")) return "blocked";
   if (l.includes("risk") || l.includes("delay") || l.includes("behind") || l.includes("overdue")) return "at_risk";
-  if (l.includes("complete") || l.includes("done") || l.includes("finish") || l.includes("closed")) return "complete";
+  if (l.includes("complete") || l.includes("done") || l.includes("finish") || l.includes("closed") || l === "100%" || l === "100") return "complete";
+  if (l.includes("pending")) return "blocked";
+
   return "on_track";
 }
 
@@ -100,7 +118,7 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
       ? `[${p.projectName}] ${p.observationsAndBlockers}`
       : p.projectName,
     projectName: p.projectName,
-    status: mapProjectStatus(p.status),
+    status: mapProjectStatus(p.status, p.percentageComplete),
     pctComplete: p.percentageComplete || null,
     hoursToday: null as number | null,
     dueDate: p.estimatedDelivery || null,
@@ -117,7 +135,7 @@ export function visionToExtractedData(vision: VisionParsedReport): ExtractedRepo
   }));
 
   const blockerProjects = vision.projects
-    .filter((p) => mapProjectStatus(p.status) === "blocked")
+    .filter((p) => mapProjectStatus(p.status, p.percentageComplete) === "blocked")
     .map((p) => `${p.projectName}: ${p.observationsAndBlockers}`);
 
   const objectivesNote = vision.plannedObjectives

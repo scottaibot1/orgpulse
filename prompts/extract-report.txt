@@ -67,6 +67,19 @@ For the "pages" array:
 - Set "includeVisual" to false for pages that are purely text-based (the text extraction captures all the information)
 - If you cannot determine page boundaries (e.g. plain text input), return "pages": []
 
+MULTILINGUAL STATUS DETECTION — these rules override all other status inference:
+- If pctComplete === 100, ALWAYS set status to "complete" regardless of any status label or language
+- Spanish completion → "complete": "Terminado", "Terminado 100%", "Completado", "Finalizado", "Concluido"
+- Spanish in-progress → "on_track": "En Proceso", "Proceso", "En Progreso", "En Avance"
+- Spanish blocked/waiting → "blocked": "Bloqueado", "En Espera", "Detenido"
+- Spanish at-risk/delayed → "at_risk": "En Riesgo", "Atrasado", "Retrasado"
+- Spanish not started → "on_track" with low pctComplete: "No Empezado", "No Iniciado", "Sin Iniciar"
+- English: "blocked", "waiting", "on hold", "authorization pending" → "blocked"
+- English: "risk", "delay", "behind", "overdue" → "at_risk"
+- English: "complete", "done", "finished", "closed" → "complete"
+- English: "in progress", "active", "ongoing", "in process" → "on_track"
+- When a percentage column shows 100%, set pctComplete to 100 and status to "complete" — the label is irrelevant
+
 Additional guidelines:
 - Create ONE task per distinct time entry or activity — never merge multiple activities into one task
 - Create ONE task per row in any project status table — table rows are never merged

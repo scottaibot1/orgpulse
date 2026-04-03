@@ -240,6 +240,46 @@ If a person has more than 20 ontack highlights total (across all subcategories),
 RULE 6 — These rules apply identically at all detail levels where highlights are shown (levels 2–5). At level 1, skip all grouping and sorting (only 1 highlight per person).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REASONING QUALITY — READ BEFORE CATEGORIZING ANY TASK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FIX 1 — LANGUAGE-AWARE STATUS DETECTION
+Status labels may appear in Spanish or other languages. Translate before categorizing:
+- "Terminado", "Completado", "Finalizado", "Concluido" → completed
+- "En Proceso", "Proceso", "En Progreso", "En Avance" → on_track
+- "Bloqueado", "En Espera", "Detenido" → blocker
+- "En Riesgo", "Atrasado", "Retrasado" → atrisk
+- "No Empezado", "No Iniciado", "Sin Iniciar" → on_track (not yet started)
+Do not categorize a task as "on_track" just because its label is unfamiliar — look it up in context.
+
+FIX 2 — PERCENTAGE-DRIVEN CATEGORIZATION
+pctComplete overrides the status label:
+- pctComplete === 100 → ALWAYS "completed", regardless of label or language
+- pctComplete >= 80 → likely "completed" or nearly so; confirm with observations text
+- pctComplete <= 15 AND task has a due date within 14 days → escalate to "atrisk"
+- pctComplete === 0 AND task appears in 3+ consecutive reports → flag as potential stall
+Never let a label of "In Progress" keep a task at "on_track" if pctComplete is 100.
+
+FIX 3 — DUE DATE EXTRACTION AND SORT PRIORITY
+Extract every date associated with a task: start date, target/delivery date, last-modified date. Use the delivery or target date as the due date. Apply Rule 3 (OVERDUE flagging) and Rule 4 (urgency sort) from LARGE LIST HANDLING above.
+
+FIX 4 — START DATE CONTEXT (STALL DETECTION)
+If a task has a startDate older than 60 days ago AND pctComplete < 30, it is a potential stall. Flag it as "atrisk" with text: "Possible stall — started [X] days ago, only [N]% complete". Do NOT silently leave it as "on_track". This applies even if the status label says "In Progress".
+
+FIX 5 — STRICT CATEGORY SEPARATION AND DEDUPLICATION
+Process each task exactly once, in this pipeline order:
+  1. Is pctComplete === 100? → "completed". Remove from pool. Done.
+  2. Is it OVERDUE (due date < summaryDate and not complete)? → "atrisk". Remove from pool. Done.
+  3. Is it actively blocked (externally blocked, waiting on authorization/approval)? → "blocker". Remove. Done.
+  4. Is pctComplete <= 15 with a near deadline, or a stall per Fix 4? → "atrisk". Remove. Done.
+  5. Is it a standout win (exceptional result, big metric)? → "standout". Remove. Done.
+  6. Everything remaining → "on_track".
+A task MUST appear in exactly one category. Never emit the same task in two highlights. Never infer a task into two categories.
+
+FIX 6 — APPLY TO ALL FORMATS
+These reasoning rules apply whether the source data came from a PDF project table, a plain text activity log, an Excel sheet, or a narrative summary. The format of the source document does not change how tasks are interpreted and categorized.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CRITICAL RULES — VIOLATION = INVALID OUTPUT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. First character { last character } — pure JSON only.
