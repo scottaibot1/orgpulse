@@ -118,17 +118,40 @@ function mapProjectStatus(s: string, pctComplete?: number | null): ExtractedRepo
 
 export function visionToExtractedData(vision: VisionParsedReport): ExtractedReportData {
   console.log(`[visionToExtractedData] in: ${vision.projects.length} projects, ${vision.activities.length} activities`);
+
+  // Use the report date as the reference for overdue detection.
+  // Fall back to today if none was extracted.
+  const reportDate = vision.reportDate ? new Date(vision.reportDate) : new Date();
+  reportDate.setUTCHours(23, 59, 59, 999); // treat "due on report day" as still at-risk
+
   // Each project row → its own task (preserving row boundary)
-  const projectTasks = vision.projects.map((p) => ({
-    description: p.observationsAndBlockers
-      ? `[${p.projectName}] ${p.observationsAndBlockers}`
-      : p.projectName,
-    projectName: p.projectName,
-    status: mapProjectStatus(p.status, p.percentageComplete),
-    pctComplete: p.percentageComplete || null,
-    hoursToday: null as number | null,
-    dueDate: p.estimatedDelivery || null,
-  }));
+  const projectTasks = vision.projects.map((p) => {
+    let status = mapProjectStatus(p.status, p.percentageComplete);
+
+    // Upgrade to at_risk if the due date has passed and the task is not complete/blocked.
+    // mapProjectStatus has no date awareness — this is the only place that can do it.
+    if (status === "on_track" && p.estimatedDelivery) {
+      try {
+        const due = new Date(p.estimatedDelivery);
+        if (!isNaN(due.getTime()) && due <= reportDate) {
+          status = "at_risk";
+          console.log(`[visionToExtractedData] ${p.projectName}: upgraded on_track→at_risk (due ${p.estimatedDelivery} ≤ report ${vision.reportDate})`);
+        }
+      } catch { /* ignore bad dates */ }
+    }
+
+    return {
+      description: p.observationsAndBlockers
+        ? `[${p.projectName}] ${p.observationsAndBlockers}`
+        : p.projectName,
+      projectName: p.projectName,
+      status,
+      // Use ?? not || so that 0% is preserved as 0, not collapsed to null
+      pctComplete: p.percentageComplete ?? null,
+      hoursToday: null as number | null,
+      dueDate: p.estimatedDelivery || null,
+    };
+  });
 
   // Each activity → its own task
   const activityTasks = vision.activities.map((a) => ({
