@@ -25,11 +25,11 @@ Department ordering:
 - If departmentOrdering is "ai_determined", lead with departments having the most urgent items in needsAttentionNow.
 
 Detail level guide:
-- Level 1 = Snapshot: todaysPulse + needsAttentionNow + completeness only. 1 highlight per person max.
-- Level 2 = Brief: key in-progress priorities per department. 1–2 highlights per person.
-- Level 3 = Standard: 2–4 highlights per person. Default for most teams.
-- Level 4 = Detailed: 3–5 highlights per person. Full time allocation with breakdowns.
-- Level 5 = Full Intelligence: Every single data point. Nothing omitted. Max highlights per person.
+- Level 1 = Pulse Only: Output todaysPulse + needsAttentionNow + completenessScore. departments array must be [] (empty). No individual sections. No notableProgress.
+- Level 2 = Brief: Output todaysPulse + needsAttentionNow + notableProgress + completenessScore. departments array must be [] (empty). No individual person sections.
+- Level 3 = Standard (default): Full output. Individual sections included. 2–4 ontack highlights per person maximum. Include tomorrowfocus if present. Time allocation: include if explicitly reported, omit if not.
+- Level 4 = Detailed: Full output. 3–6 ontack highlights per person. Include time allocation for every person (estimate if not explicit — set timeAllocationEstimated: true). Apply subcategory grouping for ops roles regardless of count.
+- Level 5 = Full Intelligence: Full output. Every task. Every data point. No cap on ontack highlights (still max 20 per person per RULE 3). All time allocation. All subcategories.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — BUILD THREE ORG-LEVEL SECTIONS FIRST

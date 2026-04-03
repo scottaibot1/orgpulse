@@ -141,7 +141,7 @@ const ATTENTION_STATUS: Record<string, { label: string; emoji: string; bg: strin
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
-const BAR_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#3b82f6", "#ec4899", "#14b8a6"];
+const BAR_COLORS = ["#378ADD", "#1D9E75", "#EF9F27", "#7F77DD", "#888780"];
 
 interface HighlightStyle {
   icon: string;
@@ -153,11 +153,11 @@ interface HighlightStyle {
 
 const HIGHLIGHT_MAP: Record<string, HighlightStyle> = {
   standout: { icon: "⭐", color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd", categoryLabel: "Notable Wins" },
-  completed: { icon: "✅", color: "#047857", bg: "#ecfdf5", border: "#6ee7b7", categoryLabel: "Completed" },
-  ontack:    { icon: "▶",  color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd", categoryLabel: "In Progress" },
-  atrisk:    { icon: "⚠️", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", categoryLabel: "At Risk" },
-  blocker:   { icon: "🚫", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Blocked" },
-  critical:  { icon: "🔴", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Critical" },
+  completed: { icon: "✓", color: "#047857", bg: "#ecfdf5", border: "#6ee7b7", categoryLabel: "Completed" },
+  ontack:    { icon: "●",  color: "#378ADD", bg: "#eff6ff", border: "#93c5fd", categoryLabel: "In Progress" },
+  atrisk:    { icon: "▲", color: "#b45309", bg: "#fffbeb", border: "#fcd34d", categoryLabel: "At Risk" },
+  blocker:   { icon: "■", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Blocked" },
+  critical:  { icon: "■", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5", categoryLabel: "Critical" },
   tomorrowfocus: { icon: "📅", color: "#0f766e", bg: "#f0fdfa", border: "#5eead4", categoryLabel: "Tomorrow's Focus" },
 };
 
@@ -196,7 +196,16 @@ function groupedHighlightsPdf(highlights: HighlightItem[]): string {
       out += `<div style="font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;margin:6px 0 3px;padding-bottom:2px;border-bottom:1px solid #e2e8f0;">${h.subcategory}</div>`;
       lastSubcategory = h.subcategory;
     }
-    const icon = (h.taskEmoji && (h.type === "ontack" || h.type === "atrisk")) ? h.taskEmoji : s.icon;
+    // Plain bullet style for ontack without emoji (≤7 items — AI doesn't set taskEmoji in that case)
+    if (h.type === "ontack" && !h.taskEmoji) {
+      out += `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:4px;padding:1px 0;">
+        <span style="color:#378ADD;font-size:8px;flex-shrink:0;margin-top:4px;line-height:1;">●</span>
+        <span style="font-size:12px;color:#334155;line-height:1.55;">${formatHighlightText(h.text)}</span>
+      </div>`;
+      continue;
+    }
+    // Card style for ontack with emoji (8+ items), tomorrowfocus, and all other types
+    const icon = h.taskEmoji ? h.taskEmoji : s.icon;
     out += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;padding:5px 9px;background:${s.bg};border-left:3px solid ${s.border};border-radius:0 4px 4px 0;">
       <span style="font-size:12px;flex-shrink:0;line-height:1.4;">${icon}</span>
       <span style="font-size:12px;color:${s.color};line-height:1.5;">${formatHighlightText(h.text)}</span>
@@ -224,7 +233,17 @@ function groupedHighlightsEmail(highlights: HighlightItem[]): string {
       out += `<tr><td style="padding:5px 0 2px;font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e2e8f0;">${h.subcategory}</td></tr>`;
       lastSubcategory = h.subcategory;
     }
-    const emailIcon = (h.taskEmoji && (h.type === "ontack" || h.type === "atrisk")) ? h.taskEmoji : s.icon;
+    // Plain bullet for ontack without emoji (≤7 items)
+    if (h.type === "ontack" && !h.taskEmoji) {
+      out += `<tr><td style="padding:2px 0;">
+        <table cellpadding="0" cellspacing="0" width="100%"><tr>
+          <td width="14" valign="top" style="padding-top:4px;color:#378ADD;font-size:8px;line-height:1;">●</td>
+          <td style="font-size:12px;color:#334155;line-height:1.55;padding:1px 0;">${formatHighlightText(h.text)}</td>
+        </tr></table>
+      </td></tr>`;
+      continue;
+    }
+    const emailIcon = h.taskEmoji ? h.taskEmoji : s.icon;
     out += `<tr><td style="padding:3px 0;">
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
         <td width="24" valign="top" style="padding:5px 6px 5px 9px;background:${s.bg};border-left:3px solid ${s.border};font-size:12px;">${emailIcon}</td>
@@ -380,7 +399,7 @@ function pdfPersonCard(p: PersonData): string {
     <div style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden;">
       <div style="background:#f8fafc;padding:9px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e2e8f0;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#818cf8,#a78bfa);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0;">${personInitial(p.name)}</div>
+          <div style="width:30px;height:30px;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0;">${personInitial(p.name)}</div>
           <div>
             <div style="font-size:13px;font-weight:700;color:#1e293b;">${p.name}</div>
             ${p.hoursWorked != null ? `<div style="font-size:10px;color:#64748b;">${p.hoursWorked}h logged</div>` : ""}
@@ -492,12 +511,23 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   })() : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>${orgName} — Executive Summary — ${formattedDate}</title>
 <style>
+:root {
+  --color-header-bg: #0f172a;
+  --color-bullet: #378ADD;
+  --color-dept-header: #0f172a;
+  --color-dept-header-text: #ffffff;
+  --color-card-bg: #ffffff;
+  --color-card-border: #e2e8f0;
+  --color-body-text: #334155;
+  --color-heading-text: #1e293b;
+  --color-muted: #64748b;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #f1f5f9; color: #1e293b; }
 .page { max-width: 840px; margin: 0 auto; background: #fff; }
@@ -508,11 +538,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Ar
 }
 </style>
 </head>
-<body>
-<button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:#6366f1;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.3);z-index:100;">Save as PDF</button>
+<body data-theme="dark">
+<button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;z-index:100;">Save as PDF</button>
 <div class="page">
 
-  <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:30px 40px 26px;">
+  <div style="background:#0f172a;padding:30px 40px 26px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;">
       <div>
         <div style="font-size:21px;font-weight:800;color:#fff;letter-spacing:-0.5px;">${orgName}</div>
@@ -587,7 +617,7 @@ function makeEmailPersonRow(ctx: RenderContext) {
           <table cellpadding="0" cellspacing="0" width="100%"><tr>
             <td style="vertical-align:middle;">
               <table cellpadding="0" cellspacing="0"><tr>
-                <td style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#818cf8,#a78bfa);text-align:center;vertical-align:middle;color:#fff;font-weight:700;font-size:12px;">${personInitial(p.name)}</td>
+                <td style="width:28px;height:28px;border-radius:50%;background:#4f46e5;text-align:center;vertical-align:middle;color:#fff;font-weight:700;font-size:12px;">${personInitial(p.name)}</td>
                 <td style="padding-left:9px;vertical-align:middle;">
                   <div style="font-size:13px;font-weight:700;color:#1e293b;">${p.name}</div>
                   ${p.hoursWorked != null ? `<div style="font-size:10px;color:#64748b;">${p.hoursWorked}h logged</div>` : ""}
@@ -727,23 +757,23 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 
   const pdfCta = pdfUrl ? `
     <table cellpadding="0" cellspacing="0" width="100%"><tr><td style="text-align:center;padding:20px 0 8px;">
-      <a href="${pdfUrl}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:11px 26px;border-radius:8px;">View &amp; Download Full PDF Report</a>
+      <a href="${pdfUrl}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:11px 26px;border-radius:8px;">View &amp; Download Full PDF Report</a>
     </td></tr></table>` : "";
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Executive Summary — ${orgName}</title>
 </head>
-<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;">
+<body data-theme="dark" style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;">
 <table cellpadding="0" cellspacing="0" width="100%" style="background:#f8fafc;">
 <tr><td style="padding:24px 16px;">
 <table cellpadding="0" cellspacing="0" width="620" align="center" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;max-width:100%;">
 
   <!-- HEADER -->
-  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:26px 28px 22px;">
+  <tr><td style="background:#0f172a;padding:26px 28px 22px;">
     <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:16px;"><tr>
       <td style="vertical-align:top;">
         <div style="font-size:18px;font-weight:800;color:#fff;">${orgName}</div>
