@@ -214,6 +214,28 @@ function mdToISO(raw: string): string {
   return `${yr}-${String(mo).padStart(2,"0")}-${String(dy).padStart(2,"0")}`;
 }
 
+const MONTH_NAMES: Record<string, number> = {
+  jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+  jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
+  january:1, february:2, march:3, april:4, june:6,
+  july:7, august:8, september:9, october:10, november:11, december:12,
+};
+
+function parseDateStr(raw: string): string | null {
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{1,2}\/\d{1,2}/.test(s)) return mdToISO(s);
+  const m = s.match(/^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/i);
+  if (m) {
+    const mo = MONTH_NAMES[m[1].toLowerCase()];
+    if (!mo) return null;
+    const dy = parseInt(m[2], 10);
+    const yr = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
+    return `${yr}-${String(mo).padStart(2,"0")}-${String(dy).padStart(2,"0")}`;
+  }
+  return null;
+}
+
 function fmtMD(iso: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
     const [, m, d] = iso.split("-");
@@ -238,24 +260,43 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
   let dueDate: string | null = null;
   let pct: number | null = null;
 
-  const both = text.match(/\s*\(\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*,\s*(\d{1,3})%\s*\)/i);
-  if (both) {
-    dueDate = mdToISO(both[1]); pct = parseInt(both[2], 10);
-    text = text.replace(both[0], "");
-    return { clean: text.replace(/\s+/g," ").trim(), dueDate, pct };
+  // (N% complete, due DATE) — e.g. "(50% complete, due Apr 1)"
+  const m1 = text.match(/\s*\(\s*(\d{1,3})%\s*(?:complete)?,?\s*due\s+([^)]+?)\s*\)/i);
+  if (m1) {
+    pct = parseInt(m1[1], 10);
+    dueDate = parseDateStr(m1[2].trim());
+    return { clean: text.replace(m1[0], "").replace(/\s+/g," ").trim(), dueDate, pct };
   }
-  const pd = text.match(/\s*\(\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*\)/i);
-  if (pd) { dueDate = mdToISO(pd[1]); text = text.replace(pd[0], ""); }
+
+  // (due DATE, N% complete) or (due DATE, N%)
+  const m2 = text.match(/\s*\(\s*due\s+([^,)]+?),\s*(\d{1,3})%\s*(?:complete)?\s*\)/i);
+  if (m2) {
+    dueDate = parseDateStr(m2[1].trim());
+    pct = parseInt(m2[2], 10);
+    return { clean: text.replace(m2[0], "").replace(/\s+/g," ").trim(), dueDate, pct };
+  }
+
+  // (due DATE) — any date format in parens
+  const m3 = text.match(/\s*\(\s*due\s+([^)]+?)\s*\)/i);
+  if (m3) {
+    const parsed = parseDateStr(m3[1].trim());
+    if (parsed) { dueDate = parsed; text = text.replace(m3[0], ""); }
+  }
+
+  // · due YYYY-MM-DD or · due M/D
+  if (!dueDate) {
+    const m4 = text.match(/\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
+    if (m4) { dueDate = mdToISO(m4[1]); text = text.replace(m4[0], ""); }
+  }
+
+  // · N% or (N%)
+  const m5 = text.match(/\s*[·•]\s*(\d{1,3})%(?!\d)/);
+  if (m5) { pct = parseInt(m5[1], 10); text = text.replace(m5[0], ""); }
   else {
-    const sd = text.match(/\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
-    if (sd) { dueDate = mdToISO(sd[1]); text = text.replace(sd[0], ""); }
+    const m6 = text.match(/\s*\((\d{1,3})%\)/);
+    if (m6) { pct = parseInt(m6[1], 10); text = text.replace(m6[0], ""); }
   }
-  const sp = text.match(/\s*[·•]\s*(\d{1,3})%(?!\d)/);
-  if (sp) { pct = parseInt(sp[1], 10); text = text.replace(sp[0], ""); }
-  else {
-    const pp = text.match(/\s*\((\d{1,3})%\)/);
-    if (pp) { pct = parseInt(pp[1], 10); text = text.replace(pp[0], ""); }
-  }
+
   return { clean: text.replace(/\s+/g," ").trim(), dueDate, pct };
 }
 
@@ -383,11 +424,11 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 
 function buildE(c: Palette) {
   return {
-    pill:         `font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500;display:inline-block;`,
+    pill:         `font-size:12px;padding:4px 12px;font-weight:500;display:inline-block;`,
     pillOk:       `background:#14532d;color:#86efac;`,
     pillWarn:     `background:#78350f;color:#fcd34d;`,
     pillNeutral:  `background:${c.bgSecondary};color:${c.textSecondary};`,
-    card:         `background:${c.bgPrimary};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};padding:16px 20px;margin-bottom:12px;`,
+    card:         `background:${c.bgPrimary};border:.5px solid ${c.borderTertiary};padding:16px 20px;margin-bottom:12px;`,
     deptLabel:    `font-size:10px;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.08em;margin:12px 0 4px;`,
     secLabel:     `font-size:11px;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.08em;margin:24px 0 12px;display:block;`,
     personName:   `font-size:15px;font-weight:500;color:${c.textPrimary};`,
@@ -396,20 +437,20 @@ function buildE(c: Palette) {
     subcat:       `font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.05em;margin:8px 0 2px;display:block;`,
     taskFont:     `font-size:13px;color:${c.textPrimary};line-height:1.5;`,
     taskSecond:   `font-size:13px;color:${c.textSecondary};line-height:1.5;`,
-    bullet:       `width:6px;height:6px;border-radius:50%;background:${c.bullet};display:inline-block;margin-top:5px;flex-shrink:0;`,
-    warnIcon:     `width:16px;height:16px;border-radius:3px;background:${c.bgWarning};border:1px solid ${c.textDueUrgent};text-align:center;font-size:10px;line-height:16px;flex-shrink:0;`,
-    blockIcon:    `width:16px;height:16px;border-radius:3px;background:${c.bgDanger};border:1px solid ${c.textDueOd};text-align:center;font-size:10px;line-height:16px;flex-shrink:0;`,
-    pct:          `font-size:11px;color:${c.textSecondary};background:${c.bgPct};padding:1px 6px;border-radius:8px;margin-left:4px;white-space:nowrap;display:inline-block;`,
+    bullet:       `width:6px;height:6px;background:${c.bullet};display:inline-block;margin-top:5px;flex-shrink:0;`,
+    warnIcon:     `width:16px;height:16px;background:${c.bgWarning};border:1px solid ${c.textDueUrgent};text-align:center;font-size:10px;line-height:16px;flex-shrink:0;`,
+    blockIcon:    `width:16px;height:16px;background:${c.bgDanger};border:1px solid ${c.textDueOd};text-align:center;font-size:10px;line-height:16px;flex-shrink:0;`,
+    pct:          `font-size:11px;color:${c.textSecondary};background:${c.bgPct};padding:1px 6px;margin-left:4px;white-space:nowrap;display:inline-block;`,
     dueNormal:    `font-size:11px;color:${c.textDue};margin-left:4px;white-space:nowrap;`,
     dueOd:        `font-size:11px;color:${c.textDueOd};margin-left:4px;white-space:nowrap;`,
     dueUrgent:    `font-size:11px;color:${c.textDueUrgent};margin-left:4px;white-space:nowrap;`,
-    tagFresh:     `font-size:10px;background:${c.bgSuccess};color:${c.textSuccess};padding:2px 8px;border-radius:10px;display:inline-block;`,
-    tagStandin:   `font-size:10px;background:${c.bgWarning};color:${c.textWarning};padding:2px 8px;border-radius:10px;display:inline-block;`,
-    tagMissing:   `font-size:10px;background:${c.bgDanger};color:${c.textDanger};padding:2px 8px;border-radius:10px;display:inline-block;`,
+    tagFresh:     `font-size:10px;background:${c.bgSuccess};color:${c.textSuccess};padding:2px 8px;display:inline-block;`,
+    tagStandin:   `font-size:10px;background:${c.bgWarning};color:${c.textWarning};padding:2px 8px;display:inline-block;`,
+    tagMissing:   `font-size:10px;background:${c.bgDanger};color:${c.textDanger};padding:2px 8px;display:inline-block;`,
     viewLink:     `font-size:11px;color:${c.textInfo};text-decoration:none;white-space:nowrap;`,
-    overdueBadge: `display:inline-block;font-size:10px;font-weight:500;background:${c.bgDanger};color:${c.textDanger};padding:2px 7px;border-radius:10px;margin-right:6px;`,
-    urgentBadge:  `display:inline-block;font-size:10px;font-weight:500;background:${c.bgWarning};color:${c.textWarning};padding:2px 7px;border-radius:10px;margin-right:6px;`,
-    deptHeaderBar:`background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusMd};padding:10px 16px;margin:16px 0 8px;`,
+    overdueBadge: `display:inline-block;font-size:10px;font-weight:500;background:${c.bgDanger};color:${c.textDanger};padding:2px 7px;margin-right:6px;`,
+    urgentBadge:  `display:inline-block;font-size:10px;font-weight:500;background:${c.bgWarning};color:${c.textWarning};padding:2px 7px;margin-right:6px;`,
+    deptHeaderBar:`background:${c.navy};border:.5px solid ${c.borderTertiary};padding:10px 16px;margin:16px 0 8px;`,
     deptBarName:  `font-size:13px;font-weight:500;color:${c.textPrimary};`,
   };
 }
@@ -702,7 +743,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 // ── Email render helpers ───────────────────────────────────────────────────────
 
 function emailPill(text: string, style: string): string {
-  return `<td style="padding-right:6px;padding-bottom:6px;"><span style="font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500;display:inline-block;${style}">${text}</span></td>`;
+  return `<td style="padding-right:6px;padding-bottom:6px;"><span style="font-size:12px;padding:4px 12px;font-weight:500;display:inline-block;${style}">${text}</span></td>`;
 }
 
 function emailTask(h: HighlightItem, e: ES): string {
@@ -741,17 +782,17 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
   const totalStr = Number.isInteger(totalH) ? `${totalH}h` : `${totalH.toFixed(1)}h`;
   const label = estimated ? `Time allocation · estimated` : `Time allocation · ${hoursWorked != null ? hoursWorked + "h" : totalStr}`;
   const note = estimated
-    ? `<tr><td style="font-size:11px;color:${c.textSecondary};font-style:italic;padding-bottom:6px;">Hours not logged — estimated from reported activities</td></tr>` : "";
+    ? `<tr><td style="font-size:11px;color:${c.textSecondary};padding-bottom:6px;"><em>Hours not logged — estimated from reported activities</em></td></tr>` : "";
 
   const rows = alloc.map((t, i) => {
     const color = BAR_COLORS[i % BAR_COLORS.length];
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
     const rest = 100 - barPct;
     const hrs = estimated ? `~${t.hours}h` : `${t.hours}h`;
-    return `<tr><td style="padding:2px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
+    return `<tr><td style="padding:2px 0;"><table cellpadding="0" cellspacing="0" width="300"><tr>
       <td width="140" valign="top" style="font-size:12px;color:${c.textSecondary};padding-right:6px;padding-top:1px;white-space:nowrap;overflow:hidden;">${t.label}</td>
       <td valign="middle" style="padding:3px 4px 0;"><table cellpadding="0" cellspacing="0" width="100%"><tr>
-        <td width="${barPct}%" height="4" bgcolor="${color}" style="background:${color};font-size:0;line-height:0;border-radius:2px;">&#8203;</td>
+        <td width="${barPct}%" height="4" bgcolor="${color}" style="background:${color};font-size:0;line-height:0;">&#8203;</td>
         ${rest > 0 ? `<td width="${rest}%" height="4" bgcolor="${c.bgSecondary}" style="background:${c.bgSecondary};font-size:0;line-height:0;">&#8203;</td>` : ""}
       </tr></table></td>
       <td width="28" valign="top" style="font-size:12px;color:${c.textSecondary};text-align:right;padding-top:1px;">${hrs}</td>
@@ -777,7 +818,7 @@ function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
     const chunk = tiles.slice(i, i + 3);
     rows += `<tr>${chunk.map(t => {
       const numColor = t.warn ? c.textDueUrgent : c.textPrimary;
-      return `<td style="width:33%;padding:4px;"><div style="background:${c.bgSecondary};border-radius:${c.radiusMd};padding:10px;text-align:center;border:.5px solid ${c.borderTertiary};"><div style="font-size:20px;font-weight:500;color:${numColor};">${t.value ?? 0}</div><div style="font-size:11px;color:${c.textSecondary};margin-top:2px;">${t.label}</div></div></td>`;
+      return `<td style="width:33%;padding:4px;"><div style="background:${c.bgSecondary};padding:10px;text-align:center;border:.5px solid ${c.borderTertiary};"><div style="font-size:20px;font-weight:500;color:${numColor};">${t.value ?? 0}</div><div style="font-size:11px;color:${c.textSecondary};margin-top:2px;">${t.label}</div></div></td>`;
     }).join("")}</tr>`;
   }
   return `<tr><td>
@@ -802,7 +843,7 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES): 
     let smRows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      smRows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:${c.bgSecondary};border-radius:${c.radiusMd};padding:10px;text-align:center;border:.5px solid ${c.borderTertiary};"><div style="font-size:20px;font-weight:500;color:${c.textPrimary};">${m.value}</div><div style="font-size:11px;color:${c.textSecondary};margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
+      smRows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:${c.bgSecondary};padding:10px;text-align:center;border:.5px solid ${c.borderTertiary};"><div style="font-size:20px;font-weight:500;color:${c.textPrimary};">${m.value}</div><div style="font-size:11px;color:${c.textSecondary};margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
     }
     pipelineHtml = `<tr><td><div style="${e.catLabel}">Pipeline snapshot</div><table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:12px;">${smRows}</table></td></tr>`;
   }
@@ -835,11 +876,11 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES): 
   }
 
   const overflowHtml = p.overflowNote
-    ? `<tr><td style="font-size:11px;color:${c.textSecondary};font-style:italic;padding-top:6px;">${p.overflowNote}</td></tr>` : "";
+    ? `<tr><td style="font-size:11px;color:${c.textSecondary};padding-top:6px;"><em>${p.overflowNote}</em></td></tr>` : "";
 
   const hasBody = pipelineHtml || ontackHtml || blockersHtml || tomorrowHtml || overflowHtml || (p.timeAllocation ?? []).length > 0;
 
-  return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:16px;border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};overflow:hidden;">
+  return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:16px;border:.5px solid ${c.borderTertiary};">
   <tr style="border-bottom:.5px solid ${c.borderTertiary};">
     <td style="padding:14px 20px;${hasBody ? `border-bottom:.5px solid ${c.borderTertiary};` : ""}">
       <table cellpadding="0" cellspacing="0" width="100%"><tr>
@@ -902,7 +943,7 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
   if (waiting.length > 0) {
     rows += `<div style="${e.deptLabel}">Waiting on external</div>`;
     for (const w of waiting) {
-      rows += `<div style="font-size:13px;color:${c.textSecondary};padding:4px 0;font-style:italic;">⏳ ${w.text} <span style="color:${c.textTertiary};">(${w.who})</span></div>`;
+      rows += `<div style="font-size:13px;color:${c.textSecondary};padding:4px 0;"><em>⏳ ${w.text} <span style="color:${c.textTertiary};">(${w.who})</span></em></div>`;
     }
   }
   return `<tr><td style="padding:0 0 16px;">
@@ -923,9 +964,9 @@ function emailNotableProgress(data: AiSummaryData, c: Palette, e: ES): string {
         <td style="font-size:13px;color:${c.textProgress};line-height:1.5;">${stripCheckmark(item)}</td>
       </tr></table>`;
     }
-    if (g.overflowNote) rows += `<div style="font-size:11px;color:${c.textSecondary};font-style:italic;margin-top:4px;">${g.overflowNote}</div>`;
+    if (g.overflowNote) rows += `<div style="font-size:11px;color:${c.textSecondary};margin-top:4px;"><em>${g.overflowNote}</em></div>`;
   }
-  const cardStyle = `background:${c.bgProgress};border:.5px solid ${c.borderProgress};border-radius:${c.radiusLg};padding:16px 20px;margin-bottom:12px;`;
+  const cardStyle = `background:${c.bgProgress};border:.5px solid ${c.borderProgress};padding:16px 20px;margin-bottom:12px;`;
   return `<tr><td style="padding:0 0 16px;">
   <div style="${e.secLabel}">🏆 Notable progress today</div>
   <div style="${cardStyle}">${rows}</div>
@@ -963,14 +1004,14 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 
   const notExpected = (data.departments ?? []).filter(d => d.notExpectedToday);
   const notExpectedRow = notExpected.length > 0
-    ? `<tr><td style="padding:0 0 12px;"><div style="background:${c.bgSecondary};border-radius:${c.radiusMd};padding:10px 16px;font-size:13px;color:${c.textSecondary};">${notExpected.map(d => `${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}`).join(" &nbsp;·&nbsp; ")}</div></td></tr>` : "";
+    ? `<tr><td style="padding:0 0 12px;"><div style="background:${c.bgSecondary};padding:10px 16px;font-size:13px;color:${c.textSecondary};">${notExpected.map(d => `${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}`).join(" &nbsp;·&nbsp; ")}</div></td></tr>` : "";
 
   const deptRows = (data.departments ?? [])
     .filter(d => !d.notExpectedToday)
     .map(d => `<tr><td>${emailDeptSection(d, ctx, c, e)}</td></tr>`).join("");
 
   const pdfCta = pdfUrl
-    ? `<tr><td style="text-align:center;padding:16px 0 8px;"><a href="${pdfUrl}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:11px 26px;border-radius:8px;">View &amp; Download Full PDF Report</a></td></tr>` : "";
+    ? `<tr><td style="text-align:center;padding:16px 0 8px;"><a href="${pdfUrl}" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:11px 26px;">View &amp; Download Full PDF Report</a></td></tr>` : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -982,7 +1023,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <body style="margin:0;padding:0;background:${c.pageBodyBg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:${c.textPrimary};">
 <table cellpadding="0" cellspacing="0" width="100%" style="background:${c.pageBodyBg};">
 <tr><td style="padding:24px 16px;">
-<table cellpadding="0" cellspacing="0" width="620" align="center" style="background:${c.bgPrimary};border-radius:${c.radiusLg};border:.5px solid ${c.borderTertiary};overflow:hidden;max-width:100%;">
+<table cellpadding="0" cellspacing="0" width="620" align="center" style="background:${c.bgPrimary};border:.5px solid ${c.borderTertiary};max-width:100%;">
   <tr><td style="background:${c.navy};padding:20px 28px 16px;">
     <table cellpadding="0" cellspacing="0" width="100%"><tr>
       <td valign="top"><div style="font-size:18px;font-weight:700;color:#fff;">${orgName}</div><div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;text-transform:uppercase;letter-spacing:.08em;">Executive Summary</div></td>
