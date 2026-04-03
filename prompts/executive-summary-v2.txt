@@ -180,7 +180,8 @@ Output ONLY a valid JSON object. First character must be { and last must be }. N
           "highlights": [
             { "type": "ontack" | "tomorrowfocus", "text": string, "subcategory": string (optional), "taskEmoji": string (optional — see EMOJI THRESHOLD rule) }
           ],
-          "overflowNote": string (optional — only present when more than 20 ontack items)
+          "overflowNote": string (optional — only present when more than 20 ontack items),
+          "salesMetrics": [ { "label": string, "value": number } ] (optional — ONLY for sales roles when pipeline data is present in narrative; see SALES ROLES rule below)
         }
       ],
       "notExpectedToday": boolean (optional — true ONLY for departments from notExpectedDepartments),
@@ -257,6 +258,9 @@ SALES roles — Extract pipeline breakdown as part of ontack highlights. Use exa
   - Highlight hot leads or accounts at a decision point by name
   - Show pipeline: new inquiries today, calls made, emails sent, proposals sent, deals closed, active pipeline count
   - Flag any lead stalled 3+ days as imminently at risk
+  - When the person's narrative contains a "Sales Pipeline:" line, extract the six numbers and set salesMetrics on their person object:
+    [ { "label": "New Today", "value": <new_leads_today> }, { "label": "Contacted", "value": <leads_contacted> }, { "label": "Hot", "value": <hot_responsive> }, { "label": "Qualified", "value": <qualified> }, { "label": "Hot but Cold", "value": <hot_but_cold> }, { "label": "Proposals", "value": <proposals_sent> } ]
+    Use the exact numbers from the narrative. Use 0 for any field that says "–" or is absent. Omit salesMetrics entirely if no pipeline data exists in the narrative.
 
 OPERATIONS / PROPERTY MANAGEMENT roles — Categorize tasks into logical work groups (Guest Experience, Facilities & Maintenance, Food & Beverage, Staff & HR, Administrative, Vendor Relations). For each category:
   - Show tasks and completion status in ontack
@@ -341,3 +345,4 @@ CRITICAL RULES — VIOLATION = INVALID OUTPUT
 18. overflowNote in notableProgress: "X additional items completed — view full report" where X is exact count of omitted items.
 19. daysOverdue must be a positive integer for overdue items — never null for status "overdue".
 20. notableProgress items must not start with ✅ or contain the ✅ character. The UI renders the completion indicator.
+21. salesMetrics appears on a person ONLY when their narrative contains a "Sales Pipeline:" line with numeric data. Never invent or estimate pipeline numbers.

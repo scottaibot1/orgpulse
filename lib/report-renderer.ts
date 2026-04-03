@@ -306,7 +306,7 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext): string {
   // Sales metrics grid
   let salesGrid = "";
   if (p.salesMetrics && p.salesMetrics.length > 0) {
-    const tiles = p.salesMetrics.map(m => `<div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;flex:1;min-width:80px;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#64748b;margin-top:2px;">${m.label}</div></div>`).join("");
+    const tiles = p.salesMetrics.map(m => `<div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;flex:1;min-width:80px;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div>`).join("");
     salesGrid = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">${tiles}</div>`;
   }
 
@@ -563,7 +563,7 @@ function emailPersonRow(p: PersonData, ctx: RenderContext): string {
     let rows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      rows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#64748b;margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
+      rows += `<tr>${chunk.map(m => `<td style="width:33%;padding:4px;"><div style="background:#f8fafc;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:500;color:#0f172a;">${m.value}</div><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.label}</div></div></td>`).join("")}</tr>`;
     }
     salesGrid = `<tr><td style="padding:0 0 12px;"><table cellpadding="0" cellspacing="0" width="100%">${rows}</table></td></tr>`;
   }
