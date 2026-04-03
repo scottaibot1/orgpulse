@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "fs";
 import path from "path";
-import { extractTextFromBuffer } from "./extract-text";
+import { anyFileToPdf } from "./file-to-pdf";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -462,7 +462,7 @@ export async function extractReportData(rawText: string, apiKey?: string | null)
   }
 }
 
-// ─── Unified file extraction (routes by type: PDF, image, or rich text) ──────
+// ─── Unified file extraction — all content sent as vision inputs, never as text ─
 
 export async function extractReportDataFromFile(
   buffer: Buffer,
@@ -476,30 +476,32 @@ export async function extractReportDataFromFile(
     ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(mimeType) ||
     ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
 
+  const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
+
+  // ── PDF: Claude native document API ─────────────────────────────────────────
   if (isPdf) {
+    console.log(`[vision-ingest] ${filename}: routing=PDF → content blocks=[document, text]`);
     const data = await extractReportDataFromPdf(buffer, apiKey);
     return { data, usedVision: true };
   }
 
+  // ── Image: direct vision input ───────────────────────────────────────────────
   if (isImage) {
-    const client = apiKey ? new Anthropic({ apiKey }) : anthropic;
     const imgMime = (
       mimeType.startsWith("image/") ? mimeType : `image/${ext === "jpg" ? "jpeg" : ext}`
     ) as "image/png" | "image/jpeg" | "image/gif" | "image/webp";
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const contentBlocks: any[] = [
+      { type: "image", source: { type: "base64", media_type: imgMime, data: buffer.toString("base64") } },
+      { type: "text", text: VISION_PARSING_INSTRUCTION },
+    ];
+    console.log(`[vision-ingest] ${filename}: routing=image/${ext} → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`);
+
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 8192,
-      messages: [{
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: imgMime, data: buffer.toString("base64") },
-          },
-          { type: "text", text: VISION_PARSING_INSTRUCTION },
-        ],
-      }],
+      messages: [{ role: "user", content: contentBlocks }],
     });
 
     const content = message.content[0];
@@ -508,13 +510,33 @@ export async function extractReportDataFromFile(
     return { data: visionToExtractedData(vision), usedVision: true };
   }
 
-  // Excel / DOCX / PPTX / plain text → rich HTML → text extraction
-  const richText = await extractTextFromBuffer(buffer, mimeType, filename);
-  if (!richText || richText.length < 10) {
-    throw new Error("File appears to be empty or unreadable");
-  }
-  const data = await extractReportData(richText, apiKey);
-  return { data, usedVision: false };
+  // ── All other types: convert to PDF → Claude native document API ─────────────
+  // Excel, DOCX, PPTX, CSV, plain text → rendered PDF → Claude reads visually
+  // Never extracts raw text. pdf-lib is pure JS, works on Vercel with no native deps.
+  const pdfBuffer = await anyFileToPdf(buffer, mimeType, filename);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentBlocks: any[] = [
+    {
+      type: "document",
+      source: { type: "base64", media_type: "application/pdf", data: pdfBuffer.toString("base64") },
+    },
+    { type: "text", text: VISION_PARSING_INSTRUCTION },
+  ];
+  console.log(
+    `[vision-ingest] ${filename}: routing=${ext}→PDF (${pdfBuffer.length} bytes) → content blocks=[${contentBlocks.map((b) => b.type).join(", ")}]`
+  );
+
+  const message = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 8192,
+    messages: [{ role: "user", content: contentBlocks }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response type from document vision call");
+  const vision = parseVisionJson(content.text);
+  return { data: visionToExtractedData(vision), usedVision: true };
 }
 
 // ─── Canonical narrative ──────────────────────────────────────────────────────
