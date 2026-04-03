@@ -164,17 +164,55 @@ const NOTABLE_DEPT_TEXT = "#15803d";
 const PULSE_TEXT       = "#f1f5f9";
 const PULSE_LABEL_TEXT = "#EF9F27";
 
-const DUE_RE = /\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2})/i;
-const PCT_RE = /\s*[·•]\s*(\d{1,3})%(?!\d)/;
+// Convert M/D or M/D/YYYY → YYYY-MM-DD; pass-through if already ISO
+function mdToISO(raw: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parts = raw.split("/");
+  if (parts.length < 2) return raw;
+  const month = parseInt(parts[0], 10);
+  const day   = parseInt(parts[1], 10);
+  let year  = parts[2] ? parseInt(parts[2], 10) : new Date().getFullYear();
+  if (year < 100) year += 2000;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 function extractDuePct(raw: string): { clean: string; dueDate: string | null; pct: number | null } {
   let text = stripCheckmark(raw);
   let dueDate: string | null = null;
   let pct: number | null = null;
-  const dueM = text.match(DUE_RE);
-  if (dueM) { dueDate = dueM[1]; text = text.replace(dueM[0], ""); }
-  const pctM = text.match(PCT_RE);
-  if (pctM) { pct = parseInt(pctM[1], 10); text = text.replace(pctM[0], ""); }
+
+  // 1. (due M/D, N%) — parenthesized date + pct together (most common AI output)
+  const bothRe = /\s*\(\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*,\s*(\d{1,3})%\s*\)/i;
+  const both = text.match(bothRe);
+  if (both) {
+    dueDate = mdToISO(both[1]);
+    pct = parseInt(both[2], 10);
+    text = text.replace(both[0], "");
+    return { clean: text.replace(/\s+/g, " ").trim(), dueDate, pct };
+  }
+
+  // 2. (due M/D) or (due M/D/YYYY) — parenthesized date only
+  const parenDueRe = /\s*\(\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*\)/i;
+  const parenDue = text.match(parenDueRe);
+  if (parenDue) { dueDate = mdToISO(parenDue[1]); text = text.replace(parenDue[0], ""); }
+  else {
+    // 3. · due YYYY-MM-DD or · due M/D — separator + due keyword
+    const sepDueRe = /\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i;
+    const sepDue = text.match(sepDueRe);
+    if (sepDue) { dueDate = mdToISO(sepDue[1]); text = text.replace(sepDue[0], ""); }
+  }
+
+  // 4. · N% — separator + percent
+  const sepPctRe = /\s*[·•]\s*(\d{1,3})%(?!\d)/;
+  const sepPct = text.match(sepPctRe);
+  if (sepPct) { pct = parseInt(sepPct[1], 10); text = text.replace(sepPct[0], ""); }
+  else {
+    // 5. (N%) — parenthesized percent alone
+    const parenPctRe = /\s*\((\d{1,3})%\)/;
+    const parenPct = text.match(parenPctRe);
+    if (parenPct) { pct = parseInt(parenPct[1], 10); text = text.replace(parenPct[0], ""); }
+  }
+
   return { clean: text.replace(/\s+/g, " ").trim(), dueDate, pct };
 }
 
@@ -544,9 +582,15 @@ function emailNeedsAttention(data: AiSummaryData): string {
   }
   const rows = items.map(item => {
     const c = ATTN[item.status] ?? ATTN.blocked;
+    const todayStr = new Date().toISOString().split("T")[0];
     const meta: string[] = [];
-    if (item.dueDate) meta.push(`due ${item.dueDate}`);
-    if (item.pctComplete != null) meta.push(`${item.pctComplete}%`);
+    if (item.dueDate) {
+      const isoDate = mdToISO(item.dueDate);
+      const dueFmt = /^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? fmtMD(isoDate) : item.dueDate;
+      const dueColor = getDueDateColor(isoDate, todayStr);
+      meta.push(`<span style="color:${dueColor};font-weight:500;">due ${dueFmt}</span>`);
+    }
+    if (item.pctComplete != null) meta.push(pctBadgeEmail(item.pctComplete));
     meta.push(item.who + (item.department ? ` · ${item.department}` : ""));
     return `<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:6px;"><tr>
     <td width="28" valign="top" style="padding:10px 6px 10px 10px;background:${c.rowBg};border-left:3px solid ${c.border};font-size:15px;">${c.emoji}</td>
