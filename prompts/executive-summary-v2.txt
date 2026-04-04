@@ -373,3 +373,28 @@ CRITICAL RULES — VIOLATION = INVALID OUTPUT
 19. daysOverdue must be a positive integer for overdue items — never null for status "overdue".
 20. notableProgress items must not start with ✅ or contain the ✅ character. The UI renders the completion indicator.
 21. salesMetrics appears on a person ONLY when their narrative contains a "Sales Pipeline:" line with numeric data. Never invent or estimate pipeline numbers.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL REINFORCEMENTS — COMMON VIOLATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The following rules have been repeatedly violated in production. They are restated here with maximum emphasis. Violation of ANY of these makes the output INVALID.
+
+REINFORCEMENT 1 — waitingOnExternal MUST BE POPULATED:
+Scan every person's narrative for external dependencies. Look for: "waiting on", "pending response from", "sent to [name] for review", "awaiting approval from", "depends on [external party]", "no response yet from". Common external dependencies include review requests sent to specific people (e.g., "sent to Scott and Kellie for review"), items awaiting creative teams, vendor responses, client decisions, and group booking decisions. An empty waitingOnExternal array when ANY person mentions waiting on an external party is a VIOLATION. Internal blockers (waiting on internal approval) go to needsAttentionNow as "blocked" — external dependencies go to waitingOnExternal.
+
+REINFORCEMENT 2 — notableProgress MUST INCLUDE ALL DEPARTMENTS:
+The notableProgress array must contain a separate group object for EVERY department that had completed tasks. If Reservations completed 3 items, Sales completed 2 items, and Private Paradise completed 4 items, the array must have 3 group objects — one per department. A single-department notableProgress when multiple departments had completions is a VIOLATION.
+
+REINFORCEMENT 3 — tomorrowfocus EXTRACTION:
+For each person, extract EVERY forward-looking plan or next step. If a person lists 4 things they plan to do tomorrow, output 4 separate tomorrowfocus items. Do NOT summarize multiple plans into one item. Do NOT truncate to 1 item when the source has more. Outputting 1 tomorrowfocus when the source report contains 4+ plans is a VIOLATION.
+
+REINFORCEMENT 4 — SUBCATEGORY DEDUPLICATION:
+BEFORE outputting each person's highlights array, verify that each subcategory label appears AT MOST ONCE. All items sharing the same subcategory must be grouped consecutively. Two or more occurrences of the same subcategory label for one person is a VIOLATION.
+
+REINFORCEMENT 5 — timeAllocation IS NEVER EMPTY FOR FRESH REPORTS:
+Every person with a fresh report MUST have a non-empty timeAllocation array. If hoursWorked is null, set timeAllocationEstimated: true and estimate 4-6 time buckets. A timeAllocation of [] for a fresh report is a VIOLATION.
+
+REINFORCEMENT 6 — timeAllocation CONSOLIDATION (MAX 6):
+Maximum 6 categories per person. More than 6 is a VIOLATION. Merge related activities.

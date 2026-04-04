@@ -509,13 +509,19 @@ function buildE(c: Palette) {
     tagFresh:     `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#14532d;color:#86efac;font-family:Arial,Helvetica,sans-serif;`,
     tagStandin:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#78350f;color:#fcd34d;font-family:Arial,Helvetica,sans-serif;`,
     tagMissing:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#7f1d1d;color:#fca5a5;font-family:Arial,Helvetica,sans-serif;`,
-    viewLink:     `font-size:11px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;color:#378ADD;text-decoration:underline;`,
+    viewLink:     `font-size:12px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;color:#818cf8;text-decoration:none;`,
     // ISSUE 1: overdue/urgent badges — dual-render handled inline
     overdueBadge: `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#7f1d1d;color:#fca5a5;font-family:Arial,Helvetica,sans-serif;`,
     urgentBadge:  `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#78350f;color:#fcd34d;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 2: dept header bar uses #0f172a bg
     deptHeaderBar:`background:#0f172a;border:1px solid #1e293b;padding:10px 16px;`,
     deptBarName:  `font-size:13px;line-height:20px;mso-line-height-rule:exactly;font-weight:500;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;`,
+    // Section spacing and card styles
+    sectionGap: `padding-top:24px;`,
+    cardBorder: `border:1px solid rgba(255,255,255,0.08);`,
+    personHeaderBg: `background-color:#172554;`,
+    personHeaderBorder: `border:1px solid #3b82f6;`,
+    deptBarAccent: `background-color:#3b82f6;`,
   };
 }
 type ES = ReturnType<typeof buildE>;
@@ -941,7 +947,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
     const hrs = estimated ? `~${roundedHrs}h` : `${roundedHrs}h`;
     // ISSUE 8: empty track uses #1e293b (not c.bgSecondary)
     return `<tr><td style="padding:2px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-  <td width="130" valign="top" style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-right:8px; padding-top:1px; white-space:nowrap; overflow:hidden; font-family:Arial,Helvetica,sans-serif;">${t.label}</td>
+  <td width="140" valign="top" style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-right:8px; padding-top:1px; white-space:nowrap; overflow:hidden; font-family:Arial,Helvetica,sans-serif;">${t.label}</td>
   <td valign="middle" style="padding:2px 4px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <!--[if mso]>
@@ -953,8 +959,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
       ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="#1e293b" style="background-color:#1e293b; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
     </tr></table>
   </td>
-  <!-- ISSUE 4: width=45, white-space:nowrap -->
-  <td width="45" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:#94a3b8; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
+  <td width="50" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:#94a3b8; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
 </tr></table></td></tr>`;
   }).join("");
 
@@ -964,7 +969,6 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
 </td></tr>`;
 }
 
-// ISSUE 11: rewritten emailPipelineGrid with cellspacing=4, bgcolor attr
 function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
   const tiles = [
     { label: "Hot Responsive",  value: snap.hot_responsive,  warn: false },
@@ -979,15 +983,20 @@ function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
     const chunk = tiles.slice(i, i + 3);
     rows += `<tr>${chunk.map(t => {
       const numColor = t.warn ? c.textDueUrgent : c.textPrimary;
-      return `<td width="33%" align="center" bgcolor="#1e293b" style="background-color:#1e293b; padding:10px 8px; font-family:Arial,Helvetica,sans-serif;">
-  <div style="font-size:20px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${numColor}; font-family:Arial,Helvetica,sans-serif;">${t.value ?? 0}</div>
-  <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif;">${t.label}</div>
+      return `<td width="33%" align="center" bgcolor="#0f172a" style="background-color:#0f172a; padding:12px 8px; border:1px solid rgba(255,255,255,0.06); font-family:Arial,Helvetica,sans-serif;">
+  <div style="font-size:22px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${numColor}; font-family:Arial,Helvetica,sans-serif;">${t.value ?? 0}</div>
+  <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif; margin-top:4px;">${t.label}</div>
 </td>`;
     }).join("")}</tr>`;
   }
-  return `<tr><td style="padding-bottom:12px;">
-  <div style="${e.catLabel} margin-bottom:6px;">Pipeline snapshot</div>
+  return `<tr><td style="padding-bottom:16px;">
+  <div style="${e.catLabel} margin-bottom:8px;">Pipeline snapshot</div>
+  <!--[if mso]>
   <table role="presentation" cellpadding="0" cellspacing="4" border="0" width="100%">${rows}</table>
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <table role="presentation" cellpadding="0" cellspacing="4" border="0" width="100%" style="border-radius:8px; -webkit-border-radius:8px; overflow:hidden;">${rows}</table>
+  <!--<![endif]-->
 </td></tr>`;
 }
 
@@ -995,7 +1004,6 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
   const href = reportHref(p.name, ctx);
   const hoursStr = p.hoursWorked != null ? `${p.hoursWorked}h logged` : "Hours not logged";
 
-  // ISSUE 9: use effectiveStatus; ISSUE 1: dual-render badge for tags
   const effStatus = effectiveStatus(p, ctx);
   let tag: string;
   if (effStatus === "standin") tag = emailBadgeDual(`Stand-in · ${p.daysSinceReport}d ago`, "#78350f", "#fcd34d");
@@ -1005,17 +1013,14 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
   const initials = avatarInitials(p.name);
   const av = avatarStyle(p.name, personIdx);
 
-  console.log(`[Email] ${p.name}: pipeline_snapshot=${JSON.stringify(p.pipeline_snapshot ?? null).slice(0, 120)}, salesMetrics=${p.salesMetrics ? p.salesMetrics.length : 0}`);
-
   let pipelineHtml = "";
   if (p.pipeline_snapshot) {
     pipelineHtml = emailPipelineGrid(p.pipeline_snapshot, c, e);
   } else if (p.salesMetrics && p.salesMetrics.length > 0) {
-    // ISSUE 5: salesMetrics fallback table with bgcolor and cellspacing
     let smRows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="#1e293b" style="background-color:#1e293b; padding:10px 8px; font-family:Arial,Helvetica,sans-serif;">
+      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="#0f172a" style="background-color:#0f172a; padding:10px 8px; border:1px solid rgba(255,255,255,0.06); font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:20px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif;">${m.value}</div>
   <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif;">${m.label}</div>
 </td>`).join("")}</tr>`;
@@ -1027,7 +1032,6 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
   const blockers = (p.highlights ?? []).filter(h => h.type === "blocker");
   const tomorrow = (p.highlights ?? []).filter(h => h.type === "tomorrowfocus");
 
-  // ISSUE 5: order: pipeline FIRST, then in-progress, blocked, tomorrow
   let ontackHtml = "";
   if (ontack.length > 0) {
     ontackHtml = `<tr><td style="padding:10px 0 4px;"><div style="${e.catLabel}">In progress</div></td></tr>`;
@@ -1058,57 +1062,77 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
 
   const viewLinkHtml = href ? `<a href="${href}" style="${e.viewLink}">View Submitted Report →</a>` : "";
 
-  // ISSUE 2 & 3 & 9: dual-render card — MSO uses border attr, non-MSO uses CSS border + border-radius + overflow:hidden
+  // Person card with consistent 16px margin-bottom, proper border treatment
   return `<!--[if mso]>
-<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b; margin-bottom:12px;">
-<tr><td style="padding:14px 20px; background-color:#1e293b;${hasBody ? " border-bottom:1px solid rgba(255,255,255,0.06);" : ""}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#1e3a5f" width="100%" style="background-color:#1e293b; margin-bottom:16px; border-collapse:separate;">
+<tr><td style="padding:0; background-color:#1e293b;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr><td style="padding:16px 20px; background-color:#172554; border-bottom:1px solid #3b82f6;">
 <![endif]-->
 <!--[if !mso]><!-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
-<tr><td style="padding:14px 20px; font-family:Arial,Helvetica,sans-serif;${hasBody ? " border-bottom:1px solid rgba(255,255,255,0.06);" : ""}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:16px;">
+<tr><td style="padding:16px 20px; background-color:#172554; border-bottom:1px solid #3b82f6; border-radius:12px 12px 0 0; -webkit-border-radius:12px 12px 0 0; font-family:Arial,Helvetica,sans-serif;">
 <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-        <td width="40" valign="top" style="padding-right:12px; width:40px; vertical-align:top;">
+        <td width="44" valign="top" style="padding-right:12px; width:44px; vertical-align:top;">
           <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="40" height="40"><tr>
-          <td align="center" valign="middle" width="40" height="40" bgcolor="${av.bg}" style="background-color:${av.bg}; color:${av.color}; font-size:14px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; font-family:Arial,Helvetica,sans-serif; text-align:center; width:40px; height:40px;">${initials}</td>
+          <td align="center" valign="middle" width="40" height="40" bgcolor="${av.bg}" style="background-color:${av.bg}; color:${av.color}; font-size:14px; line-height:16px; mso-line-height-rule:exactly; font-weight:600; font-family:Arial,Helvetica,sans-serif; text-align:center; width:40px; height:40px;">${initials}</td>
           </tr></table><![endif]-->
           <!--[if !mso]><!-->
-          <div style="width:40px; height:40px; border-radius:50%; -webkit-border-radius:50%; background-color:${av.bg}; color:${av.color}; font-size:14px; line-height:40px; mso-line-height-rule:exactly; font-weight:500; text-align:center; font-family:Arial,Helvetica,sans-serif;">${initials}</div>
+          <div style="width:40px; height:40px; border-radius:50%; -webkit-border-radius:50%; background-color:${av.bg}; color:${av.color}; font-size:14px; line-height:40px; mso-line-height-rule:exactly; font-weight:600; text-align:center; font-family:Arial,Helvetica,sans-serif;">${initials}</div>
           <!--<![endif]-->
         </td>
-        <td style="vertical-align:top; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
-          <div style="${e.personName}">${p.name}</div>
-          <div style="${e.personMeta}">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
+        <td style="vertical-align:middle; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
+          <div style="font-size:15px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; color:#ffffff; font-family:Arial,Helvetica,sans-serif;">${p.name}</div>
+          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#93c5fd; font-family:Arial,Helvetica,sans-serif; margin-top:2px;">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
         </td>
         <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:12px;">${tag}</td>
       </tr></table>
     </td>
   </tr>
-  ${hasBody ? `<tr><td style="padding:12px 20px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
+  ${hasBody ? `<tr><td style="padding:16px 20px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${pipelineHtml}${ontackHtml}${blockersHtml}${tomorrowHtml}${overflowHtml}
       ${emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c, e)}
     </table>
   </td></tr>` : ""}
-</table>`;
+<!--[if mso]>
+  </table>
+</td></tr>
+</table>
+<![endif]-->
+<!--[if !mso]><!-->
+</table>
+<!--<![endif]-->`;
 }
 
 function emailDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, e: ES, startIdx: number = 0): string {
   const statusPill = dept.statusOk
     ? emailStatusBadgeDual("all reported", "#14532d", "#86efac")
     : `<span style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#f59e0b; font-family:Arial,Helvetica,sans-serif;">${dept.statusLabel}</span>`;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:20px 0 8px;">
+
+  // Department header bar with blue accent — increased margin for spacing
+  const deptBar = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:28px 0 12px;">
   <tr>
-    <td width="4" bgcolor="#4f46e5" style="background-color:#4f46e5; font-size:0; line-height:0;">&nbsp;</td>
-    <td bgcolor="#1e293b" style="background-color:#1e293b; padding:10px 16px; font-family:Arial,Helvetica,sans-serif;">
+    <td width="4" bgcolor="#3b82f6" style="background-color:#3b82f6; font-size:0; line-height:0;">&nbsp;</td>
+    <!--[if mso]>
+    <td bgcolor="#172554" style="background-color:#172554; padding:12px 16px; border:1px solid #3b82f6; font-family:Arial,Helvetica,sans-serif;">
+    <![endif]-->
+    <!--[if !mso]><!-->
+    <td style="background-color:#172554; padding:12px 16px; border:1px solid #3b82f6; border-left:none; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0; font-family:Arial,Helvetica,sans-serif;">
+    <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-        <td style="${e.deptBarName} word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
+        <td style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; color:#93c5fd; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
         <td style="text-align:right; white-space:nowrap; padding-left:12px;">${statusPill}</td>
       </tr></table>
     </td>
   </tr>
-</table>
-${(dept.people ?? []).map((p, i) => emailPersonCard(p, ctx, c, e, startIdx + i)).join("")}`;
+</table>`;
+
+  // Person cards with 16px gap between each
+  const personCards = (dept.people ?? []).map((p, i) => emailPersonCard(p, ctx, c, e, startIdx + i)).join("");
+
+  return deptBar + personCards;
 }
 
 // ISSUE 1 & 2: emailNeedsAttention — dual-render badges, card bg #111827 border #1e293b
@@ -1151,10 +1175,18 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
       rows += `<div style="font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#64748b; padding:2px 0; font-family:Arial,Helvetica,sans-serif;">· ${highlighted} <span style="color:#475569;">(${w.who})</span></div>`;
     }
   }
-  return `<tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
+  return `<tr><td style="padding:0 0 20px; font-family:Arial,Helvetica,sans-serif;">
   <div style="${e.secLabel}">🔥 Needs attention now</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
-  <tr><td style="padding:4px 16px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">${rows}</td></tr>
+  <!--[if mso]>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b; margin-bottom:12px;">
+  <tr><td style="padding:12px 20px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+  <tr><td style="padding:12px 20px; font-family:Arial,Helvetica,sans-serif;">
+  <!--<![endif]-->
+  ${rows}
+  </td></tr>
   </table>
 </td></tr>`;
 }
@@ -1166,8 +1198,8 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
   let firstDept = true;
   for (const g of groups) {
     if (g.department) {
-      const mt = firstDept ? "0" : "12px";
-      rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:#4ade80; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; margin:${mt} 0 5px; border-bottom:1px solid #166534; padding-bottom:4px;">${g.department}</div>`;
+      const mt = firstDept ? "0" : "14px";
+      rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:#4ade80; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; margin:${mt} 0 6px; border-bottom:1px solid #166534; padding-bottom:4px;">${g.department}</div>`;
       firstDept = false;
     }
     for (const item of (g.items ?? [])) {
@@ -1178,13 +1210,19 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
     }
     if (g.overflowNote) rows += `<div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-family:Arial,Helvetica,sans-serif; font-style:italic; margin-top:4px;"><em>${g.overflowNote}</em></div>`;
   }
-  // ISSUE 3: table with left-border accent cell
-  return `<tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
-  <div style="font-size:11px; font-weight:500; color:#4ade80; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif; mso-line-height-rule:exactly; display:block; margin-bottom:8px;">🏆 Notable progress today</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#166534" width="100%" style="background-color:#0d2818; border:1px solid #166534; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
-  <tr>
-    <td style="background-color:#0d2818; padding:16px 20px; font-family:Arial,Helvetica,sans-serif;">${rows}</td>
-  </tr>
+  // Notable Progress — label INSIDE the green box, green border around entire section
+  return `<tr><td style="padding:0 0 20px; font-family:Arial,Helvetica,sans-serif;">
+  <!--[if mso]>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#166534" width="100%" style="background-color:#0d2818; margin-bottom:12px;">
+  <tr><td style="padding:16px 20px; background-color:#0d2818; font-family:Arial,Helvetica,sans-serif;">
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#0d2818; border:1px solid #166534; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+  <tr><td style="padding:16px 20px; font-family:Arial,Helvetica,sans-serif;">
+  <!--<![endif]-->
+    <div style="font-size:11px; font-weight:600; color:#4ade80; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif; mso-line-height-rule:exactly; margin-bottom:12px;">🏆 Notable progress today</div>
+    ${rows}
+  </td></tr>
   </table>
 </td></tr>`;
 }
@@ -1281,7 +1319,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
         <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.45); margin-top:3px; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif;">Executive Summary</div>
       </td>
       <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:16px;">
-        <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.6); font-family:Arial,Helvetica,sans-serif;">${formattedDate}</div>
+        <div style="font-size:13px; line-height:18px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.7); font-weight:500; font-family:Arial,Helvetica,sans-serif;">${formattedDate}</div>
       </td>
     </tr></table>
   </td></tr>
@@ -1290,7 +1328,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${emailNeedsAttention(data, c, e)}
       ${emailNotableProgress(data, c)}
-      <tr><td style="padding:0 0 12px; font-family:Arial,Helvetica,sans-serif;"><div style="${e.secLabel}">👤 Individual reports</div></td></tr>
+      <tr><td style="padding:20px 0 12px; font-family:Arial,Helvetica,sans-serif;"><div style="${e.secLabel}">👤 Individual reports</div></td></tr>
       ${deptRows}
       ${notExpectedRow}
       ${pdfCta}
