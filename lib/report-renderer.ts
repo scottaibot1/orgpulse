@@ -471,12 +471,11 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 
 // ISSUE 1: dual-render badge helper (MSO table + non-MSO span)
 function emailBadgeDual(text: string, bg: string, fg: string): string {
-  return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bg}; color:${fg}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><span style="display:inline-block; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; border-radius:20px; -webkit-border-radius:20px; white-space:nowrap; background:${bg}; color:${fg}; font-family:Arial,Helvetica,sans-serif;">${text}</span><!--<![endif]-->`;
+  return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bg}; color:${fg}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; border-radius:20px; -webkit-border-radius:20px; white-space:nowrap; background-color:${bg}; color:${fg}; font-family:Arial,Helvetica,sans-serif;">${text}</td></tr></table><!--<![endif]-->`;
 }
 
-// ISSUE 1: dual-render status badge helper (smaller radius for overdue/urgent)
 function emailStatusBadgeDual(text: string, bg: string, fg: string): string {
-  return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bg}; color:${fg}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><span style="display:inline-block; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; border-radius:10px; -webkit-border-radius:10px; white-space:nowrap; background:${bg}; color:${fg}; font-family:Arial,Helvetica,sans-serif;">${text}</span><!--<![endif]-->`;
+  return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bg}; color:${fg}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; border-radius:10px; -webkit-border-radius:10px; white-space:nowrap; background-color:${bg}; color:${fg}; font-family:Arial,Helvetica,sans-serif;">${text}</td></tr></table><!--<![endif]-->`;
 }
 
 function buildE(c: Palette) {
@@ -874,7 +873,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 
 // ISSUE 1 & 11: MSO dual-render pill builder for scorecard — MSO table + non-MSO span
 function emailPill(text: string, bgSolid: string, _bgRgba: string, color: string): string {
-  return `<td style="padding-right:8px;padding-bottom:6px;white-space:nowrap;"><!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bgSolid}; color:${color}; font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; padding:4px 12px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><span style="display:inline-block; background:${bgSolid}; color:${color}; font-size:11px; line-height:16px; mso-line-height-rule:exactly; padding:4px 12px; border-radius:20px; -webkit-border-radius:20px; font-weight:500; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</span><!--<![endif]--></td>`;
+  return `<td style="padding-right:8px;padding-bottom:6px;white-space:nowrap;"><!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bgSolid}; color:${color}; font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; padding:4px 12px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bgSolid}; color:${color}; font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; padding:4px 12px; border-radius:20px; -webkit-border-radius:20px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><!--<![endif]--></td>`;
 }
 
 // ISSUE 1, 4E, 13: emailTask with bullet <div>, OVERDUE badge in separate <td>
@@ -1167,7 +1166,7 @@ function emailNotableProgress(data: AiSummaryData, c: Palette, e: ES): string {
   // ISSUE 3: table with left-border accent cell
   return `<tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
   <div style="${e.secLabel}">🏆 Notable progress today</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px; border-radius:8px; -webkit-border-radius:8px; overflow:hidden;">
   <tr>
     <td width="4" style="background-color:#1D9E75; font-size:0; line-height:0;">&nbsp;</td>
     <td style="background-color:#0d2818; padding:14px 16px; font-family:Arial,Helvetica,sans-serif;">${rows}</td>
@@ -1230,8 +1229,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <title>Executive Summary — ${orgName}</title>
 <!--[if mso]>
 <style type="text/css">
-  body, table, td, p, a, li, div, span { font-family: Arial, Helvetica, sans-serif !important; font-size: 13px !important; line-height: 20px !important; }
-  h1, h2, h3, h4, h5, h6 { font-size: 15px !important; line-height: 22px !important; font-weight: 500 !important; }
+  body, table, td, p, a, li, div, span { font-family: Arial, Helvetica, sans-serif !important; }
   table { border-collapse: collapse !important; }
 </style>
 <![endif]-->
@@ -1250,8 +1248,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" align="center" style="table-layout:fixed; width:700px;">
 <tr><td style="width:700px; padding:0;">
 <![endif]-->
-<!-- ISSUE 2: main content wrapper bg #111827; ISSUE 7: max-width:100% table-layout:fixed -->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:700px; max-width:100%; table-layout:fixed; word-wrap:break-word; background-color:#111827; border:1px solid #1e293b;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px; table-layout:fixed; word-wrap:break-word; background-color:#080c14;">
   <tr><td style="background-color:${c.navy}; padding:20px 28px 16px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td valign="top" style="font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
