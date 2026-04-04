@@ -489,14 +489,13 @@ function buildE(c: Palette) {
     pillNeutralColor:  `#94a3b8`,
     pillWarnBg:   `#78350f`,
     pillWarnColor:`#fcd34d`,
-    // card and layout — ISSUE 2: updated card bg
-    card:         `background:#111827;border:1px solid #1e293b;padding:16px 20px;margin-bottom:12px;`,
-    deptLabel:    `font-size:10px;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;`,
-    secLabel:     `font-size:11px;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;display:block;`,
+    card:         `background:#1e293b;border:1px solid rgba(255,255,255,0.08);padding:16px 20px;margin-bottom:12px;`,
+    deptLabel:    `font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;`,
+    secLabel:     `font-size:11px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;display:block;margin-bottom:10px;`,
     personName:   `font-size:15px;line-height:20px;mso-line-height-rule:exactly;font-weight:500;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;`,
-    personMeta:   `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textSecondary};font-family:Arial,Helvetica,sans-serif;`,
-    catLabel:     `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.06em;font-family:Arial,Helvetica,sans-serif;display:block;`,
-    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;`,
+    personMeta:   `font-size:12px;line-height:16px;mso-line-height-rule:exactly;color:${c.textTertiary};font-family:Arial,Helvetica,sans-serif;margin-top:2px;`,
+    catLabel:     `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;font-family:Arial,Helvetica,sans-serif;display:block;margin:14px 0 5px;`,
+    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
     taskFont:     `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#e2e8f0;font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     taskSecond:   `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textSecondary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     warnIcon:     `width:16px;height:16px;background:${c.bgWarning};border:1px solid ${c.textDueUrgent};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
@@ -1061,12 +1060,12 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
 
   // ISSUE 2 & 3 & 9: dual-render card — MSO uses border attr, non-MSO uses CSS border + border-radius + overflow:hidden
   return `<!--[if mso]>
-<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#1e293b" width="100%" style="background-color:#111827; margin-bottom:16px;">
-<tr><td style="padding:14px 20px; background-color:#111827;${hasBody ? " border-bottom:1px solid #1e293b;" : ""}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b; margin-bottom:12px;">
+<tr><td style="padding:14px 20px; background-color:#1e293b;${hasBody ? " border-bottom:1px solid rgba(255,255,255,0.06);" : ""}">
 <![endif]-->
 <!--[if !mso]><!-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#111827; border:1px solid #1e293b; border-radius:8px; -webkit-border-radius:8px; overflow:hidden; margin-bottom:16px;">
-<tr><td style="padding:14px 20px; font-family:Arial,Helvetica,sans-serif;${hasBody ? " border-bottom:1px solid #1e293b;" : ""}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+<tr><td style="padding:14px 20px; font-family:Arial,Helvetica,sans-serif;${hasBody ? " border-bottom:1px solid rgba(255,255,255,0.06);" : ""}">
 <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
         <td width="40" valign="top" style="padding-right:12px; width:40px; vertical-align:top;">
@@ -1085,7 +1084,7 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
       </tr></table>
     </td>
   </tr>
-  ${hasBody ? `<tr><td style="padding:12px 20px; background-color:#111827; font-family:Arial,Helvetica,sans-serif;">
+  ${hasBody ? `<tr><td style="padding:12px 20px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${pipelineHtml}${ontackHtml}${blockersHtml}${tomorrowHtml}${overflowHtml}
       ${emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c, e)}
@@ -1146,14 +1145,17 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
     }
   }
   if (waiting.length > 0) {
-    rows += `<div style="${e.deptLabel} padding:8px 0 4px;">Waiting on external</div>`;
+    rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:#475569; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; padding:10px 0 6px; border-top:1px solid rgba(255,255,255,0.06); margin-top:6px;">⏳ Waiting on External</div>`;
     for (const w of waiting) {
-      rows += `<div style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding:4px 0; font-family:Arial,Helvetica,sans-serif; font-style:italic;"><em>⏳ ${w.text} <span style="color:${c.textTertiary};">(${w.who})</span></em></div>`;
+      const highlighted = w.text.replace(/\b(Scott(?:\s+and\s+Kellie)?|Kellie|Creative Team|John|Nova|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g, `<span style="color:#818cf8;">$1</span>`);
+      rows += `<div style="font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#64748b; padding:2px 0; font-family:Arial,Helvetica,sans-serif;">· ${highlighted} <span style="color:#475569;">(${w.who})</span></div>`;
     }
   }
   return `<tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
   <div style="${e.secLabel}">🔥 Needs attention now</div>
-  <div style="${e.card}">${rows}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b; border:1px solid rgba(255,255,255,0.08); border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+  <tr><td style="padding:4px 16px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">${rows}</td></tr>
+  </table>
 </td></tr>`;
 }
 
@@ -1179,10 +1181,9 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
   // ISSUE 3: table with left-border accent cell
   return `<tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:11px; font-weight:500; color:#4ade80; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif; mso-line-height-rule:exactly; display:block; margin-bottom:8px;">🏆 Notable progress today</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:12px; border-radius:8px; -webkit-border-radius:8px; overflow:hidden;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#166534" width="100%" style="background-color:#0d2818; border:1px solid #166534; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
   <tr>
-    <td width="4" style="background-color:#1D9E75; font-size:0; line-height:0;">&nbsp;</td>
-    <td style="background-color:#0d2818; padding:14px 16px; font-family:Arial,Helvetica,sans-serif;">${rows}</td>
+    <td style="background-color:#0d2818; padding:16px 20px; font-family:Arial,Helvetica,sans-serif;">${rows}</td>
   </tr>
   </table>
 </td></tr>`;
@@ -1264,15 +1265,15 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   img { border:0; display:block; }
 </style>
 </head>
-<!-- ISSUE 2: body bg #080c14 -->
-<body style="margin:0; padding:0; background-color:#080c14;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#080c14;">
+<!-- ISSUE 2: body bg #0f172a -->
+<body style="margin:0; padding:0; background-color:#0f172a;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#0f172a;">
 <tr><td align="center" style="padding:24px 16px;">
 <!--[if mso]>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" align="center" style="table-layout:fixed; width:700px;">
 <tr><td style="width:700px; padding:0;">
 <![endif]-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:#080c14;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:#0f172a;">
   <tr><td style="background-color:${c.navy}; padding:20px 28px 16px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td valign="top" style="font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
