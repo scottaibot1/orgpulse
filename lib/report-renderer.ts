@@ -564,7 +564,7 @@ function pdfTomorrowItem(h: HighlightItem): string {
   return `<div class="tmrow-item"><span>📅</span>${clean}</div>`;
 }
 
-function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined, c: Palette): string {
+function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined): string {
   if (!alloc || alloc.length === 0) return "";
   const totalH = alloc.reduce((s, t) => s + (t.hours ?? 0), 0);
   const totalStr = estimated ? `~${Number.isInteger(totalH) ? totalH : totalH.toFixed(0)}h est.` : `${hoursWorked != null ? hoursWorked : (Number.isInteger(totalH) ? totalH : totalH.toFixed(1))}h total`;
@@ -585,7 +585,7 @@ function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined
 </div>`;
 }
 
-function pdfPipelineGrid(snap: PipelineSnapshot, c: Palette): string {
+function pdfPipelineGrid(snap: PipelineSnapshot): string {
   const tiles = [
     { label: "New Today",       value: snap.new_leads_today, warn: false },
     { label: "Contacted",       value: snap.leads_contacted, warn: false },
@@ -647,7 +647,7 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx:
 
   let pipelineHtml = "";
   if (p.pipeline_snapshot) {
-    pipelineHtml = pdfPipelineGrid(p.pipeline_snapshot, c);
+    pipelineHtml = pdfPipelineGrid(p.pipeline_snapshot);
   } else if (p.salesMetrics && p.salesMetrics.length > 0) {
     const cells = p.salesMetrics.map(m =>
       `<div class="ptile"><div class="ptile-num">${m.value}</div><div class="ptile-label">${m.label}</div></div>`
@@ -689,7 +689,7 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx:
   const overflowHtml = p.overflowNote
     ? `<div style="font-size:12px;color:#475569;font-style:italic;margin-top:8px">${p.overflowNote}</div>` : "";
 
-  const timeBarsHtml = pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c);
+  const timeBarsHtml = pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked);
 
   const metaViewLink = viewLinkHtml ? ` · ${viewLinkHtml}` : "";
 
@@ -762,7 +762,7 @@ function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext):
   return `<div class="sec-label">🔥 Needs Attention Now</div><div class="attn-card">${rows}</div>`;
 }
 
-function pdfNotableProgress(data: AiSummaryData, c: Palette): string {
+function pdfNotableProgress(data: AiSummaryData): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   let rows = "";
@@ -786,7 +786,6 @@ function pdfPulse(data: AiSummaryData, ctx: RenderContext): string {
   const pct = cs?.percentage ?? 0;
   const missing = (cs?.missing ?? []).length;
   const hrs = totalHours(data);
-  const activeDepts = (data.departments ?? []).filter(d => !d.notExpectedToday && d.reportedCount > 0).length;
   const dateLabel = ctx.summaryDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   const pills = [
@@ -850,7 +849,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   <div class="r">
     ${pdfPulse(data, ctx)}
     ${pdfNeedsAttention(data, c, ctx)}
-    ${pdfNotableProgress(data, c)}
+    ${pdfNotableProgress(data)}
     ${deptSections}
     ${notExpectedBar}
     <div style="text-align:center;padding:24px 0 8px;border-top:0.5px solid rgba(255,255,255,0.06);margin-top:24px;">
