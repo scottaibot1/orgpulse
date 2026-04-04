@@ -181,7 +181,8 @@ Output ONLY a valid JSON object. First character must be { and last must be }. N
             { "type": "ontack" | "tomorrowfocus", "text": string, "subcategory": string (optional), "taskEmoji": string (optional — see EMOJI THRESHOLD rule) }
           ],
           "overflowNote": string (optional — only present when more than 20 ontack items),
-          "salesMetrics": [ { "label": string, "value": number } ] (optional — ONLY for sales roles when pipeline data is present in narrative; see SALES ROLES rule below)
+          "salesMetrics": [ { "label": string, "value": number } ] (optional — ONLY for sales roles when pipeline data is present in narrative; see SALES ROLES rule below),
+          "pipeline_snapshot": { "new_leads_today": number, "leads_contacted": number, "hot_responsive": number, "qualified": number, "hot_but_cold": number, "proposals_sent": number } (optional — MUST be populated for sales roles with any pipeline data; do NOT leave null for sales roles)
         }
       ],
       "notExpectedToday": boolean (optional — true ONLY for departments from notExpectedDepartments),
@@ -196,9 +197,9 @@ EMOJI THRESHOLD — SUBCATEGORY-LEVEL ICONS FOR LARGE IN PROGRESS LISTS
 
 THRESHOLD CHECK: Count only the person's ontack highlights. Do not count tomorrowfocus.
 
-If the ontack count is 7 or fewer: do NOT set taskEmoji on ANY highlight. STOP.
+If the ontack count is 7 or fewer: do NOT set taskEmoji on ANY highlight. STOP. (ISSUE 12: 7 or fewer = NO emoji at all)
 
-If the ontack count is 8 or more: apply GROUP-LEVEL emoji assignment.
+If the ontack count is 8 or more: apply GROUP-LEVEL emoji assignment. Choose ONE emoji per subcategory from the approved list and prepend it to the FIRST task in each subcategory (set taskEmoji on every highlight in the group).
 STEP 1 — Group the ontack highlights by their subcategory field.
 STEP 2 — For each group, pick ONE emoji from the approved list that best represents the group.
 STEP 3 — Set that same taskEmoji value on EVERY highlight in the group.
@@ -242,6 +243,9 @@ LARGE LIST HANDLING — APPLIES TO ONTACK HIGHLIGHTS
 RULE 1 — SUBCATEGORY GROUPING
 When any person has more than 10 ontack highlights, group those items by subcategory. Set "subcategory" on each highlight to a short descriptive label (e.g. "Facilities & Maintenance", "Food & Beverage", "Guest Experience", "Staff & HR", "Administrative", "Vendor Relations"). For operations/property management roles, ALWAYS use subcategories regardless of count.
 
+RULE 1B — NO DUPLICATE SUBCATEGORY LABELS (ISSUE 10)
+NEVER output the same subcategory label twice for the same person. If multiple tasks belong to the same subcategory, group them all together under a single subcategory entry. Each subcategory must appear at most once per person.
+
 RULE 2 — URGENCY SORT within ontack (and within each subcategory):
 1. Due within 7 days — soonest first
 2. Due within 30 days — soonest first
@@ -251,8 +255,8 @@ RULE 2 — URGENCY SORT within ontack (and within each subcategory):
 RULE 3 — COLLAPSED VIEW
 If a person has more than 20 ontack highlights, emit only the first 20 and set overflowNote: "X additional tasks in pipeline — view full report".
 
-RULE 4 — TASK TRUNCATION AT 10 (ISSUE 7)
-If a person has more than 10 in-progress tasks, include only the 10 most urgent or important tasks in the highlights array. After the last included task, add one final ontack item with the text "[N] additional tasks — view full report" where N is the exact count of omitted tasks. This applies at all detail levels except Level 5 (Full Intelligence), where the cap is 20 per RULE 3.
+RULE 4 — TASK TRUNCATION AT 10 (ISSUE 7 / ISSUE 10)
+If a person has more than 10 in-progress tasks total, include only the 10 most urgent or important tasks in the highlights array. After the last included task, add one final ontack item with the text "[N] additional tasks — view full report" where N is the exact count of omitted tasks. This applies at all detail levels except Level 5 (Full Intelligence), where the cap is 20 per RULE 3.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPLETENESS RULES — EVERY PERSON ENTRY (ISSUE 8)
@@ -277,8 +281,10 @@ SALES roles — Extract pipeline breakdown as part of ontack highlights. Use exa
   - Highlight hot leads or accounts at a decision point by name
   - Show pipeline: new inquiries today, calls made, emails sent, proposals sent, deals closed, active pipeline count
   - Flag any lead stalled 3+ days as imminently at risk
-  - When the person's narrative contains a "Sales Pipeline:" line, extract the six numbers and set salesMetrics on their person object:
-    [ { "label": "New Today", "value": <new_leads_today> }, { "label": "Contacted", "value": <leads_contacted> }, { "label": "Hot", "value": <hot_responsive> }, { "label": "Qualified", "value": <qualified> }, { "label": "Hot but Cold", "value": <hot_but_cold> }, { "label": "Proposals", "value": <proposals_sent> } ]
+  - ISSUE 5: For sales roles, you MUST populate the pipeline_snapshot object with these exact fields from their report data: new_leads_today, leads_contacted, hot_responsive, qualified, hot_but_cold, proposals_sent. Do NOT leave pipeline_snapshot null for sales roles. If the report mentions pipeline metrics (even partial), extract them into this structure. Use 0 for any value that is absent or shows "–".
+  - When the person's narrative contains a "Sales Pipeline:" line, extract the six numbers and set BOTH salesMetrics AND pipeline_snapshot on their person object:
+    pipeline_snapshot: { "new_leads_today": <n>, "leads_contacted": <n>, "hot_responsive": <n>, "qualified": <n>, "hot_but_cold": <n>, "proposals_sent": <n> }
+    salesMetrics: [ { "label": "New Today", "value": <new_leads_today> }, { "label": "Contacted", "value": <leads_contacted> }, { "label": "Hot", "value": <hot_responsive> }, { "label": "Qualified", "value": <qualified> }, { "label": "Hot but Cold", "value": <hot_but_cold> }, { "label": "Proposals", "value": <proposals_sent> } ]
     Use the exact numbers from the narrative. Use 0 for any field that says "–" or is absent. Omit salesMetrics entirely if no pipeline data exists in the narrative.
 
 OPERATIONS / PROPERTY MANAGEMENT roles — Categorize tasks into logical work groups (Guest Experience, Facilities & Maintenance, Food & Beverage, Staff & HR, Administrative, Vendor Relations). For each category:
