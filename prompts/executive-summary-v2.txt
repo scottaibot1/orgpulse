@@ -75,7 +75,7 @@ Inclusion criteria (all must be true):
 - Person has isStandIn === false AND reportDate >= reportingWindowStart
 - Task is complete: pctComplete === 100, OR status is Terminado/Completado/Finalizado/Concluido, OR language clearly indicates finished
 
-Group by department. Within each department group:
+Group by department — every qualifying department gets its own group entry in notableProgress. Do NOT collapse multiple departments into one or omit any department that has completions. If Reservations, Sales, AND Private Paradise all have completed items, all three must appear as separate groups in notableProgress. Within each department group:
 - Cap at 10 items per person. If a person has more than 10 completed tasks, include the 10 most recently completed (or simply the first 10 in order) and set overflowNote: "X additional items completed — view full report"
 - Do NOT include ✅ emoji in any item text — the UI provides the completion indicator
 
@@ -265,8 +265,10 @@ COMPLETENESS RULES — EVERY PERSON ENTRY (ISSUE 8)
 8A — ESTIMATED TIME ALLOCATION:
 If a person did not log numeric hours but described activities, you MUST estimate their time allocation from the activities described. Set timeAllocationEstimated: true. Label it clearly. Use conservative estimates. NEVER omit the timeAllocation array — either use logged hours or provide estimated hours based on described activities. A timeAllocation array of [] is only acceptable if the person's entry is a stand-in with no activity description.
 
+TIME ALLOCATION CONSOLIDATION: Consolidate related activities into 4–6 major buckets. Do NOT list every individual activity as its own time category. Group similar work: "Email Review" and "STS Requirements Updates" → "Email & STS Review"; "PP guest quotes" and "FFE quote preparation" → "Quote Preparation & Guest Services". Maximum 6 time allocation categories per person. If a person lists 8 granular activities, you must merge them into at most 6 consolidated groups before outputting timeAllocation.
+
 8B — TOMORROW'S FOCUS:
-Every person's entry MUST include at least one tomorrowfocus highlight item. If no forward-looking items are mentioned in their report, add one tomorrowfocus item with text "No items specified — follow up if needed". This applies to all fresh reports. Stand-in and missing entries are exempt.
+Every person's entry MUST include at least one tomorrowfocus highlight item. Extract ALL forward-looking items, plans, and next steps the person mentioned — include 3–5 items when available. Do not truncate to just 1 item. If a person listed multiple plans ("tomorrow I will…", "next steps:", "mañana:", "plans for tomorrow:"), extract each one as a separate tomorrowfocus entry. If no forward-looking items are mentioned in their report, add one tomorrowfocus item with text "No items specified — follow up if needed". This applies to all fresh reports. Stand-in and missing entries are exempt.
 
 8C — CONSISTENT CATEGORIZATION DEPTH:
 Apply the same subcategory depth to every person regardless of role. For operations, facilities, and hospitality roles, categorize tasks into: Guest Experience, Facilities & Maintenance, Food & Beverage, Staff & HR, Technical Systems, Administrative, Coordination. Every task for these roles must have a subcategory assigned regardless of count.
