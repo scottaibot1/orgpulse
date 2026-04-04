@@ -225,7 +225,7 @@ function parseDateStr(raw: string): string | null {
   const s = raw.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   if (/^\d{1,2}\/\d{1,2}/.test(s)) return mdToISO(s);
-  const m = s.match(/^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/i);
+  const m = s.match(/^([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?$/i);
   if (m) {
     const mo = MONTH_NAMES[m[1].toLowerCase()];
     if (!mo) return null;
@@ -236,9 +236,14 @@ function parseDateStr(raw: string): string | null {
   return null;
 }
 
-function fmtMD(iso: string): string {
+function fmtMD(iso: string, refDate?: Date): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-    const [, m, d] = iso.split("-");
+    const [yr, m, d] = iso.split("-");
+    const refYear = refDate ? refDate.getFullYear() : new Date().getFullYear();
+    const isoYear = parseInt(yr, 10);
+    if (isoYear !== refYear) {
+      return `${parseInt(m)}/${parseInt(d)}/${String(isoYear).slice(-2)}`;
+    }
     return `${parseInt(m)}/${parseInt(d)}`;
   }
   return iso;
@@ -246,13 +251,23 @@ function fmtMD(iso: string): string {
 
 function today(): string { return new Date().toISOString().split("T")[0]; }
 
-function dueDateStatus(iso: string): "overdue" | "urgent" | "normal" {
-  const t = new Date(today()); t.setHours(0,0,0,0);
+function dueDateStatus(iso: string, refDate?: Date): "overdue" | "urgent" | "normal" {
+  const t = refDate ? new Date(refDate) : new Date(today());
+  t.setHours(0,0,0,0);
   const d = new Date(iso + "T00:00:00");
   const diff = Math.floor((d.getTime() - t.getTime()) / 86400000);
-  if (diff < 0) return "overdue";
+  if (diff <= 0) return "overdue";
   if (diff <= 7) return "urgent";
   return "normal";
+}
+
+function effectiveStatus(p: PersonData, ctx: RenderContext): "fresh" | "standin" | "missing" {
+  if (p.status !== "standin") return p.status;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const gen = new Date(ctx.summaryDate); gen.setHours(0,0,0,0);
+  const daysSinceGen = Math.round((now.getTime() - gen.getTime()) / 86400000);
+  if (p.daysSinceReport === 0 || p.daysSinceReport === daysSinceGen) return "fresh";
+  return "standin";
 }
 
 function extractDuePct(raw: string): { clean: string; dueDate: string | null; pct: number | null } {
@@ -283,6 +298,12 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
     if (parsed) { dueDate = parsed; text = text.replace(m3[0], ""); }
   }
 
+  // (N% complete) or (N% done) without due date
+  if (pct === null) {
+    const m3b = text.match(/\s*\(\s*(\d{1,3})%\s*(?:complete|done|finished)?\s*\)/i);
+    if (m3b) { pct = parseInt(m3b[1], 10); text = text.replace(m3b[0], ""); }
+  }
+
   // · due YYYY-MM-DD or · due M/D
   if (!dueDate) {
     const m4 = text.match(/\s*[·•\-]\s*due\s+(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
@@ -300,12 +321,12 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
   return { clean: text.replace(/\s+/g," ").trim(), dueDate, pct };
 }
 
-function iconType(h: HighlightItem): "bullet" | "warn" | "block" {
+function iconType(h: HighlightItem, refDate?: Date): "bullet" | "warn" | "block" {
   if (h.type === "blocker") return "block";
   if (h.type === "atrisk") return "warn";
   if (h.type === "ontack") {
     const { dueDate } = extractDuePct(h.text);
-    if (dueDate && dueDateStatus(dueDate) === "overdue") return "warn";
+    if (dueDate && dueDateStatus(dueDate, refDate) === "overdue") return "warn";
   }
   return "bullet";
 }
@@ -366,56 +387,82 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 .page{max-width:880px;margin:0 auto;background:${c.pageBg};padding:2rem 2.5rem 3rem;}
 .r{padding:1.5rem 0;max-width:880px;font-family:var(--font-sans)}
 .pulse{background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:var(--border-radius-lg);padding:1.5rem;margin-bottom:1.5rem}
-.pulse-label{font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem}
-.pulse-headline{font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6;margin-bottom:1rem}
-.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pulse-label{font-size:11px;font-weight:500;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.625rem}
+.pulse-inner{background:${c.bgSecondary};border-left:4px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:1rem}
+.pulse-headline{font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6}
+.pulse-pills{display:flex;flex-wrap:wrap;gap:8px}
 .pill{font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500}
 .pill-ok{background:#14532d;color:#86efac}
 .pill-warn{background:#78350f;color:#fcd34d}
 .pill-neutral{background:${c.bgSecondary};color:${c.textSecondary};border:.5px solid ${c.borderTertiary}}
-.sec-label{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:1.5rem 0 .75rem}
+.sec-label{font-size:11px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;margin:1.5rem 0 .75rem}
 .card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem}
+.attn-card{background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};padding:4px 16px;margin-bottom:1.25rem}
 .dept-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:.75rem 0 .35rem}
 .dept-label:first-child{margin-top:0}
-.attn-row{display:flex;gap:10px;align-items:flex-start;padding:.6rem 0;border-bottom:.5px solid var(--color-border-tertiary)}
+.attn-row{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:.5px solid rgba(255,255,255,0.06)}
 .attn-row:last-child{border-bottom:none}
-.attn-icon{font-size:14px;flex-shrink:0;margin-top:2px}
-.attn-body{font-size:13px;color:var(--color-text-primary);line-height:1.5}
-.attn-action{font-size:12px;color:var(--color-text-info);margin-top:3px;font-style:italic}
-.overdue-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 7px;border-radius:10px;margin-right:6px}
-.urgent-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-warning);color:var(--color-text-warning);padding:2px 7px;border-radius:10px;margin-right:6px}
-.person-card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:1rem;overflow:hidden}
-.person-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-bottom:.5px solid var(--color-border-tertiary)}
-.person-name{font-size:15px;font-weight:500;color:var(--color-text-primary)}
-.person-meta{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
-.person-body{padding:1rem 1.25rem}
-.cat-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:.85rem 0 .35rem}
+.attn-icon{font-size:15px;flex-shrink:0;margin-top:2px}
+.attn-body{flex:1}
+.attn-title{font-size:13px;font-weight:500;color:${c.textPrimary};line-height:1.5;margin-bottom:3px}
+.attn-meta{font-size:11px;color:${c.textTertiary}}
+.waiting-section{padding:8px 0 4px}
+.waiting-label{font-size:10px;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.waiting-item{font-size:12px;color:${c.textTertiary};padding:2px 0}
+.waiting-name{color:${c.textInfo}}
+.notable-card{background:${c.bgProgress};border:.5px solid ${c.borderProgress};border-radius:${c.radiusLg};padding:1rem 1.25rem;margin-bottom:.75rem}
+.notable-label{font-size:11px;font-weight:500;color:${c.textProgressLabel};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem}
+.notable-dept{font-size:10px;font-weight:500;color:${c.textProgressLabel};text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .3rem;border-bottom:.5px solid ${c.borderProgress};padding-bottom:4px}
+.notable-dept:first-of-type{margin-top:0}
+.notable-item{display:flex;gap:8px;font-size:13px;color:${c.textProgress};line-height:1.5;padding:2px 0}
+.check{color:${c.textProgressLabel};flex-shrink:0}
+.notable-more{font-size:12px;color:${c.textSecondary};font-style:italic;margin-top:8px}
+.overdue-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 8px;border-radius:4px;margin-right:8px}
+.urgent-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-warning);color:var(--color-text-warning);padding:2px 8px;border-radius:4px;margin-right:8px}
+.blocked-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 8px;border-radius:4px;margin-right:8px}
+.person-card{background:${c.bgPrimary};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};margin-bottom:12px}
+.person-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:.5px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:8px}
+.person-left{display:flex;align-items:center;gap:12px}
+.avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;flex-shrink:0}
+.person-name{font-size:15px;font-weight:500;color:${c.textPrimary}}
+.person-sub{font-size:12px;color:${c.textTertiary};margin-top:2px}
+.view-link{color:${c.textInfo};font-size:12px;text-decoration:none;margin-left:8px}
+.tag-fresh{background:${c.bgSuccess};color:${c.textSuccess};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.tag-standin{background:${c.bgWarning};color:${c.textWarning};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.tag-missing{background:${c.bgDanger};color:${c.textDanger};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.person-body{padding:16px 20px}
+.cat-label{font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;margin:14px 0 5px}
 .cat-label:first-child{margin-top:0}
-.task{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--color-text-primary);line-height:1.5;padding:2px 0}
-.task-meta{font-size:11px;color:var(--color-text-secondary);margin-left:4px}
-.task-meta.overdue{color:var(--color-text-danger)}
-.check{width:16px;height:16px;border-radius:3px;background:var(--color-background-success);border:.5px solid var(--color-border-success);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
-.warn-icon{width:16px;height:16px;border-radius:3px;background:var(--color-background-warning);border:1px solid ${c.textDueUrgent};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
-.block-icon{width:16px;height:16px;border-radius:3px;background:var(--color-background-danger);border:1px solid ${c.textDueOd};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
-.bullet{width:6px;height:6px;border-radius:50%;background:${c.bullet};flex-shrink:0;margin-top:5px}
-.timebar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;color:var(--color-text-secondary)}
-.timebar-label{width:140px;flex-shrink:0;line-height:1.3}
-.timebar-track{flex:1;height:4px;background:${c.bgSecondary};border-radius:2px;overflow:hidden}
-.timebar-fill{height:100%;border-radius:2px}
-.view-link{font-size:11px;color:var(--color-text-info);text-decoration:none;white-space:nowrap}
-.tag-fresh{font-size:10px;background:var(--color-background-success);color:var(--color-text-success);padding:2px 8px;border-radius:10px}
-.tag-standin{font-size:10px;background:${c.bgWarning};color:${c.textWarning};padding:2px 8px;border-radius:10px}
-.tag-missing{font-size:10px;background:${c.bgDanger};color:${c.textDanger};padding:2px 8px;border-radius:10px}
-.subcat{font-size:10px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0 .2rem}
-.pct{font-size:11px;color:${c.textSecondary};background:${c.bgPct};padding:1px 6px;border-radius:8px;margin-left:4px;white-space:nowrap}
-.due{font-size:11px;color:${c.textDue};margin-left:4px;white-space:nowrap}
-.due.od{color:${c.textDueOd}}
-.due.urgent{color:${c.textDueUrgent}}
-.tmrow-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--color-text-secondary);padding:2px 0}
+.task{display:flex;gap:8px;align-items:flex-start;padding:4px 0}
+.task-text{font-size:13px;color:#e2e8f0;line-height:1.5;flex:1}
+.warn-icon{width:16px;height:16px;border-radius:4px;background:${c.bgWarning};border:1px solid #f59e0b;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.block-icon{width:16px;height:16px;border-radius:4px;background:${c.bgDanger};border:1px solid #ef4444;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.bullet{width:6px;height:6px;border-radius:50%;background:${c.bullet};flex-shrink:0;margin-top:6px}
+.timebars{margin-top:16px;padding-top:14px;border-top:.5px solid rgba(255,255,255,0.06)}
+.timebars-header{display:flex;justify-content:space-between;margin-bottom:10px}
+.timebars-title{font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em}
+.timebars-total{font-size:12px;color:${c.textTertiary}}
+.timebars-note{font-size:11px;color:#475569;font-style:italic;margin-bottom:8px}
+.tbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.tbar-label{font-size:12px;color:${c.textTertiary};width:130px;flex-shrink:0;line-height:1.3}
+.tbar-track{flex:1;height:4px;background:${c.bgSecondary};border-radius:2px;overflow:hidden}
+.tbar-fill{height:4px;border-radius:2px}
+.tbar-h{font-size:12px;color:${c.textTertiary};white-space:nowrap}
+.subcat{font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 3px}
+.pct{background:${c.bgPct};color:${c.textSecondary};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:6px;display:inline-block;white-space:nowrap}
+.due{font-size:11px;color:${c.textDue};margin-left:6px;white-space:nowrap}
+.due.od{color:${c.textDueOd};font-weight:500}
+.due.urgent{color:${c.textDueUrgent};font-weight:500}
+.tmrow-item{display:flex;gap:8px;font-size:13px;color:${c.textSecondary};padding:3px 0;line-height:1.5}
 .dept-header-bar{display:flex;align-items:center;justify-content:space-between;background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:1rem 0 .5rem}
 .dept-header-bar-name{font-size:13px;font-weight:500;color:${c.textPrimary}}
-.dept-header-bar-status{font-size:11px;color:#22c55e}
+.dept-header-bar-status{font-size:11px;color:${c.textSuccess};background:${c.bgSuccess};padding:2px 10px;border-radius:20px}
+.pipeline-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.ptile{background:${c.bgSecondary};border-radius:${c.radiusMd};padding:.6rem;text-align:center;border:.5px solid ${c.borderTertiary}}
+.ptile-num{font-size:20px;font-weight:500;color:${c.textPrimary}}
+.ptile-label{font-size:11px;color:${c.textSecondary};margin-top:2px}
 .not-expected-bar{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:.5rem 0;font-size:13px;color:var(--color-text-secondary)}
+.placeholder{font-size:13px;color:#475569;padding:6px 0}
 @media print{@page{margin:10mm 8mm;size:A4;}body{background:${c.pageBodyBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;}.print-btn{display:none!important;}}
 `.trim();
 }
@@ -460,29 +507,30 @@ type ES = ReturnType<typeof buildE>;
 
 function pdfAttnBadge(item: NeedsAttentionItem): string {
   if (item.status === "overdue") {
-    const days = item.daysOverdue ? ` ${item.daysOverdue} day${item.daysOverdue === 1 ? "" : "s"}` : "";
-    return `<span class="overdue-badge">OVERDUE${days}</span>`;
+    const days = item.daysOverdue ? `${item.daysOverdue}d OVERDUE` : "OVERDUE";
+    return `<span class="overdue-badge">${days}</span>`;
   }
+  if (item.status === "blocked") return `<span class="blocked-badge">BLOCKED</span>`;
   if (item.status === "imminentlyDue" || item.status === "dueSoon") return `<span class="urgent-badge">DUE SOON</span>`;
   return "";
 }
 
 function pdfAttnIcon(item: NeedsAttentionItem): string {
-  if (item.status === "blocked") return "🚨";
-  return "⚠️";
+  if (item.status === "blocked") return "🚫";
+  return "🔥";
 }
 
-function pdfDueStr(item: NeedsAttentionItem): string {
+function pdfDueStr(item: NeedsAttentionItem, refDate?: Date): string {
   if (!item.dueDate) return "";
   const iso = mdToISO(item.dueDate);
-  const fmt = fmtMD(iso);
+  const fmt = fmtMD(iso, refDate);
   if (item.status === "overdue") return ` · was due ${fmt}`;
   return ` · due ${fmt}`;
 }
 
-function pdfTask(h: HighlightItem): string {
+function pdfTask(h: HighlightItem, refDate?: Date): string {
   const { clean, dueDate, pct } = extractDuePct(h.text);
-  const icon = iconType(h);
+  const icon = iconType(h, refDate);
   let iconHtml: string;
   if (icon === "warn")  iconHtml = `<div class="warn-icon">⚠</div>`;
   else if (icon === "block") iconHtml = `<div class="block-icon">🚫</div>`;
@@ -490,201 +538,261 @@ function pdfTask(h: HighlightItem): string {
 
   let dueHtml = "";
   if (dueDate) {
-    const st = dueDateStatus(dueDate);
+    const st = dueDateStatus(dueDate, refDate);
     const cls = st === "overdue" ? " od" : st === "urgent" ? " urgent" : "";
     const prefix = st === "overdue" ? "was due " : "due ";
-    dueHtml = `<span class="due${cls}">· ${prefix}${fmtMD(dueDate)}</span>`;
+    dueHtml = `<span class="due${cls}">· ${prefix}${fmtMD(dueDate, refDate)}</span>`;
   }
   const pctHtml = pct != null ? `<span class="pct">${pct}%</span>` : "";
 
-  return `<div class="task">${iconHtml}${clean}${dueHtml}${pctHtml}</div>`;
+  return `<div class="task">${iconHtml}<div class="task-text">${clean}${dueHtml}${pctHtml}</div></div>`;
 }
 
 function pdfTomorrowItem(h: HighlightItem): string {
   const { clean } = extractDuePct(h.text);
-  return `<div class="tmrow-item"><span style="font-size:13px">📅</span>${clean}</div>`;
+  return `<div class="tmrow-item"><span>📅</span>${clean}</div>`;
 }
 
 function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined, c: Palette): string {
   if (!alloc || alloc.length === 0) return "";
   const totalH = alloc.reduce((s, t) => s + (t.hours ?? 0), 0);
-  const totalStr = Number.isInteger(totalH) ? `${totalH}h` : `${totalH.toFixed(1)}h`;
-  const label = estimated ? `Time allocation · estimated` : `Time allocation · ${hoursWorked != null ? hoursWorked + "h" : totalStr}`;
+  const totalStr = estimated ? `~${Number.isInteger(totalH) ? totalH : totalH.toFixed(0)}h est.` : `${hoursWorked != null ? hoursWorked : (Number.isInteger(totalH) ? totalH : totalH.toFixed(1))}h total`;
+  const titleLabel = estimated ? `Time Allocation · Estimated` : `Time Allocation`;
   const rows = alloc.map((t, i) => {
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
     const color = BAR_COLORS[i % BAR_COLORS.length];
     const hrs = estimated ? `~${t.hours}h` : `${t.hours}h`;
-    return `<div class="timebar-row"><div class="timebar-label">${t.label}</div><div class="timebar-track"><div class="timebar-fill" style="width:${barPct}%;background:${color}"></div></div><span>${hrs}</span></div>`;
+    return `<div class="tbar"><div class="tbar-label">${t.label}</div><div class="tbar-track"><div class="tbar-fill" style="width:${barPct}%;background:${color}"></div></div><span class="tbar-h">${hrs}</span></div>`;
   }).join("");
-  const note = estimated ? `<div style="font-size:11px;color:${c.textSecondary};margin-bottom:.5rem;font-style:italic">Hours not logged — estimated from reported activities</div>` : "";
-  return `<div class="cat-label" style="margin-top:1rem">${label}</div>${note}${rows}`;
+  const note = estimated ? `<div class="timebars-note">Hours not logged — estimated from reported activities</div>` : "";
+  return `<div class="timebars">
+  <div class="timebars-header">
+    <span class="timebars-title">${titleLabel}</span>
+    <span class="timebars-total">${totalStr}</span>
+  </div>
+  ${note}${rows}
+</div>`;
 }
 
 function pdfPipelineGrid(snap: PipelineSnapshot, c: Palette): string {
   const tiles = [
-    { label: "Hot responsive",  value: snap.hot_responsive,  warn: false },
-    { label: "Qualified",       value: snap.qualified,       warn: false },
-    { label: "Hot but cold",    value: snap.hot_but_cold,    warn: true  },
-    { label: "New today",       value: snap.new_leads_today, warn: false },
+    { label: "New Today",       value: snap.new_leads_today, warn: false },
     { label: "Contacted",       value: snap.leads_contacted, warn: false },
-    { label: "Proposals sent",  value: snap.proposals_sent,  warn: false },
+    { label: "Hot",             value: snap.hot_responsive,  warn: false },
+    { label: "Qualified",       value: snap.qualified,       warn: false },
+    { label: "Hot but Cold",    value: snap.hot_but_cold,    warn: true  },
+    { label: "Proposals",       value: snap.proposals_sent,  warn: false },
   ];
   const cells = tiles.map(t => {
-    const color = t.warn ? `color:${c.textDueUrgent}` : `color:${c.textPrimary}`;
-    return `<div style="background:${c.bgSecondary};border-radius:${c.radiusMd};padding:.6rem;text-align:center;border:.5px solid ${c.borderTertiary}"><div style="font-size:20px;font-weight:500;${color}">${t.value ?? 0}</div><div style="font-size:11px;color:${c.textSecondary}">${t.label}</div></div>`;
+    const numStyle = t.warn ? ` style="color:#f59e0b;"` : "";
+    return `<div class="ptile"><div class="ptile-num"${numStyle}>${t.value ?? 0}</div><div class="ptile-label">${t.label}</div></div>`;
   }).join("");
-  return `<div class="cat-label">Pipeline snapshot</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">${cells}</div>`;
+  return `<div class="pipeline-grid">${cells}</div>`;
 }
 
-function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette): string {
+function avatarInitials(name: string): string {
+  // Extract nickname from parentheses if present: "Isabella (Bella) Zacarias" → use Bella
+  const nicknameMatch = name.match(/\(([^)]+)\)/);
+  const nickname = nicknameMatch ? nicknameMatch[1] : null;
+  // Filter out parenthesized parts
+  const parts = name.split(/\s+/).filter(p => p.length > 0 && !p.startsWith("(") && !p.startsWith(")"));
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+  // If there's a nickname, use nickname[0] + last-part[0]
+  if (nickname) {
+    return (nickname[0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  // Use first letter of first two words
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  { bg: "#1e3a5f", color: "#93c5fd" },
+  { bg: "#4a1040", color: "#f9a8d4" },
+  { bg: "#064e3b", color: "#6ee7b7" },
+  { bg: "#2e1065", color: "#c4b5fd" },
+  { bg: "#1c1917", color: "#d6d3d1" },
+];
+
+function avatarStyle(name: string, idx: number): { bg: string; color: string } {
+  return AVATAR_COLORS[idx % AVATAR_COLORS.length];
+}
+
+function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx: number = 0): string {
   const href = reportHref(p.name, ctx);
-  const viewLink = href ? ` · <a class="view-link" href="${href}">View Submitted Report →</a>` : "";
+  const viewLinkHtml = href ? `<a class="view-link" href="${href}">View Submitted Report →</a>` : "";
   const hoursStr = p.hoursWorked != null ? `${p.hoursWorked}h logged` : "Hours not logged";
+  const effStatus = effectiveStatus(p, ctx);
   let tag: string;
-  if (p.status === "standin") tag = `<span class="tag-standin">Stand-in · ${p.daysSinceReport}d ago</span>`;
-  else if (p.status === "missing") tag = `<span class="tag-missing">Missing</span>`;
-  else tag = `<span class="tag-fresh">Today</span>`;
+  if (effStatus === "standin") tag = `<span class="tag-standin">Stand-in · ${p.daysSinceReport}d ago</span>`;
+  else if (effStatus === "missing") tag = `<span class="tag-missing">Missing</span>`;
+  else tag = `<span class="tag-fresh">✓ Today</span>`;
+
+  const initials = avatarInitials(p.name);
+  const av = avatarStyle(p.name, personIdx);
+  const avatarHtml = `<div class="avatar" style="background:${av.bg};color:${av.color}">${initials}</div>`;
+
+  console.log(`[Report] ${p.name}: pipeline_snapshot=${JSON.stringify(p.pipeline_snapshot ?? null).slice(0, 100)}`);
 
   let pipelineHtml = "";
   if (p.pipeline_snapshot) {
     pipelineHtml = pdfPipelineGrid(p.pipeline_snapshot, c);
   } else if (p.salesMetrics && p.salesMetrics.length > 0) {
     const cells = p.salesMetrics.map(m =>
-      `<div style="background:${c.bgSecondary};border-radius:${c.radiusMd};padding:.6rem;text-align:center;border:.5px solid ${c.borderTertiary}"><div style="font-size:20px;font-weight:500;color:${c.textPrimary}">${m.value}</div><div style="font-size:11px;color:${c.textSecondary}">${m.label}</div></div>`
+      `<div class="ptile"><div class="ptile-num">${m.value}</div><div class="ptile-label">${m.label}</div></div>`
     ).join("");
-    pipelineHtml = `<div class="cat-label">Pipeline snapshot</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">${cells}</div>`;
+    pipelineHtml = `<div class="pipeline-grid">${cells}</div>`;
   }
 
+  const refDate = ctx.summaryDate;
   const ontack    = (p.highlights ?? []).filter(h => h.type === "ontack" || h.type === "atrisk");
   const blockers  = (p.highlights ?? []).filter(h => h.type === "blocker");
   const tomorrow  = (p.highlights ?? []).filter(h => h.type === "tomorrowfocus");
 
+  // Determine cat-label prefix based on whether pipeline is shown
+  const inProgressLabel = pipelineHtml ? "In Progress" : (ontack.some(h => h.subcategory) ? "In Progress — Active Projects" : "In Progress");
+
   let ontackHtml = "";
   if (ontack.length > 0) {
-    ontackHtml += `<div class="cat-label">In progress</div>`;
+    ontackHtml += `<div class="cat-label">${inProgressLabel}</div>`;
     let lastSub: string | undefined;
     for (const h of ontack) {
       if (h.subcategory && h.subcategory !== lastSub) {
         ontackHtml += `<div class="subcat">${h.subcategory}</div>`;
         lastSub = h.subcategory;
       }
-      ontackHtml += pdfTask(h);
+      ontackHtml += pdfTask(h, refDate);
     }
   }
 
   let blockersHtml = "";
   if (blockers.length > 0) {
-    blockersHtml = `<div class="cat-label">Blocked</div>` + blockers.map(h => pdfTask(h)).join("");
+    blockersHtml = `<div class="cat-label">Blocked</div>` + blockers.map(h => pdfTask(h, refDate)).join("");
   }
 
   let tomorrowHtml = "";
   if (tomorrow.length > 0) {
-    tomorrowHtml = `<div class="cat-label">Tomorrow's focus</div>` + tomorrow.map(h => pdfTomorrowItem(h)).join("");
+    tomorrowHtml = `<div class="cat-label">Tomorrow's Focus</div>` + tomorrow.map(h => pdfTomorrowItem(h)).join("");
   }
 
   const overflowHtml = p.overflowNote
-    ? `<div style="font-size:11px;color:${c.textSecondary};font-style:italic;margin-top:.5rem">${p.overflowNote}</div>` : "";
+    ? `<div style="font-size:12px;color:#475569;font-style:italic;margin-top:8px">${p.overflowNote}</div>` : "";
 
   const timeBarsHtml = pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c);
 
+  const metaViewLink = viewLinkHtml ? ` · ${viewLinkHtml}` : "";
+
   return `<div class="person-card">
   <div class="person-header">
-    <div>
-      <div class="person-name">${p.name}</div>
-      <div class="person-meta">${hoursStr} · ${tag}${viewLink}</div>
+    <div class="person-left">
+      ${avatarHtml}
+      <div>
+        <div class="person-name">${p.name}</div>
+        <div class="person-sub">${hoursStr}${metaViewLink}</div>
+      </div>
     </div>
+    ${tag}
   </div>
   <div class="person-body">
     ${pipelineHtml}${ontackHtml}${blockersHtml}${tomorrowHtml}${overflowHtml}${timeBarsHtml}
+    ${viewLinkHtml ? `<div style="margin-top:12px;text-align:right;">${viewLinkHtml}</div>` : ""}
   </div>
 </div>`;
 }
 
-function pdfDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette): string {
+function pdfDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, startIdx: number = 0): string {
   if (dept.notExpectedToday) return "";
-  const statusColor = dept.statusOk ? "#22c55e" : "#f59e0b";
-  return `<div class="dept-header-bar" style="margin-top:1.5rem">
+  return `<div class="dept-header-bar">
   <span class="dept-header-bar-name">${dept.emoji} ${dept.name}</span>
-  <span class="dept-header-bar-status" style="color:${statusColor}">${dept.statusLabel}</span>
+  <span class="dept-header-bar-status">${dept.statusOk ? "All reported" : dept.statusLabel}</span>
 </div>
-${(dept.people ?? []).map(p => pdfPersonCard(p, ctx, c)).join("")}`;
+${(dept.people ?? []).map((p, i) => pdfPersonCard(p, ctx, c, startIdx + i)).join("")}`;
 }
 
-function pdfNeedsAttention(data: AiSummaryData, c: Palette): string {
+function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext): string {
+  const refDate = ctx.summaryDate;
   const items = (data.needsAttentionNow ?? []).slice().sort((a, b) => (b.daysOverdue ?? 0) - (a.daysOverdue ?? 0));
   const waiting = data.waitingOnExternal ?? [];
   if (items.length === 0 && waiting.length === 0) {
-    return `<div class="sec-label">🔥 Needs attention now</div>
-<div class="card"><div style="font-size:13px;color:${c.textSuccess}">🟢 No overdue, blocked, or imminently due items today.</div></div>`;
+    return `<div class="sec-label">🔥 Needs Attention Now</div>
+<div class="attn-card"><div style="font-size:13px;color:${c.textSuccess};padding:12px 0">🟢 No overdue, blocked, or imminently due items today.</div></div>`;
   }
 
-  const grouped = groupAttention(items);
   let rows = "";
-  for (const [dept, deptItems] of Array.from(grouped.entries())) {
-    rows += `<div class="dept-label">${dept}</div>`;
-    for (const item of deptItems) {
-      const badge = pdfAttnBadge(item);
-      const icon = pdfAttnIcon(item);
-      const dueStr = pdfDueStr(item);
-      rows += `<div class="attn-row">
+  for (const item of items) {
+    const badge = pdfAttnBadge(item);
+    const icon = pdfAttnIcon(item);
+    const dueStr = pdfDueStr(item, refDate);
+    const pctStr = item.pctComplete != null ? ` · ${item.pctComplete}%` : "";
+    const metaParts = [dueStr ? dueStr.replace(/^ · /, "") : null, pctStr ? pctStr.replace(/^ · /, "") : null, item.who, item.department].filter(Boolean);
+    const meta = metaParts.join(" · ");
+    rows += `<div class="attn-row">
   <div class="attn-icon">${icon}</div>
-  <div>
-    <div class="attn-body">${badge}${item.text}${dueStr}</div>
+  <div class="attn-body">
+    <div class="attn-title">${badge}${item.text}</div>
+    ${meta ? `<div class="attn-meta">${meta}</div>` : ""}
   </div>
 </div>`;
-    }
   }
 
   if (waiting.length > 0) {
-    rows += `<div class="dept-label" style="margin-top:.75rem">Waiting on external</div>`;
+    let waitingItems = "";
     for (const w of waiting) {
-      rows += `<div class="attn-row">
-  <div class="attn-icon">⏳</div>
-  <div><div class="attn-body">${w.text} <span style="color:${c.textSecondary}">(${w.who})</span></div></div>
-</div>`;
+      // Bold the name part if it appears in text
+      const highlighted = w.text.replace(/\b(Scott and Kellie|Creative Team|Laura Kessler and Imani Allen|[A-Z][a-z]+ [A-Z][a-z]+)\b/g, '<span class="waiting-name">$1</span>');
+      waitingItems += `<div class="waiting-item">· ${highlighted} (${w.who})</div>`;
     }
+    rows += `<div class="waiting-section">
+  <div class="waiting-label">⏳ Waiting on External</div>
+  ${waitingItems}
+</div>`;
   }
 
-  return `<div class="sec-label">🔥 Needs attention now</div><div class="card">${rows}</div>`;
+  return `<div class="sec-label">🔥 Needs Attention Now</div><div class="attn-card">${rows}</div>`;
 }
 
 function pdfNotableProgress(data: AiSummaryData, c: Palette): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   let rows = "";
+  let firstDept = true;
   for (const g of groups) {
-    if (g.department) rows += `<div class="dept-label" style="color:${c.textProgressLabel}">${g.department}</div>`;
-    for (const item of (g.items ?? [])) {
-      rows += `<div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:${c.textProgress};line-height:1.5;padding:3px 0"><span style="font-size:14px">✅</span>${stripCheckmark(item)}</div>`;
+    if (g.department) {
+      rows += `<div class="notable-dept${firstDept ? "" : ""}">${g.department}</div>`;
+      firstDept = false;
     }
-    if (g.overflowNote) rows += `<div style="font-size:11px;color:${c.textSecondary};font-style:italic;margin-top:.25rem">${g.overflowNote}</div>`;
+    for (const item of (g.items ?? [])) {
+      rows += `<div class="notable-item"><span class="check">✓</span>${stripCheckmark(item)}</div>`;
+    }
+    if (g.overflowNote) rows += `<div class="notable-more">${g.overflowNote}</div>`;
   }
-  const cardStyle = `background:${c.bgProgress};border:.5px solid ${c.borderProgress};border-radius:${c.radiusLg};padding:1rem 1.25rem;margin-bottom:.75rem;`;
-  return `<div class="sec-label">🏆 Notable progress today</div><div style="${cardStyle}">${rows}</div>`;
+  return `<div class="notable-card"><div class="notable-label">🏆 Notable Progress</div>${rows}</div>`;
 }
 
 function pdfPulse(data: AiSummaryData, ctx: RenderContext): string {
-  const cs = data.completenessScore ?? {};
-  const fresh = cs.freshToday ?? 0;
-  const pct = cs.percentage ?? 0;
-  const missing = (cs.missing ?? []).length;
+  const cs = data.completenessScore;
+  const fresh = cs?.freshToday ?? 0;
+  const pct = cs?.percentage ?? 0;
+  const missing = (cs?.missing ?? []).length;
   const hrs = totalHours(data);
   const activeDepts = (data.departments ?? []).filter(d => !d.notExpectedToday && d.reportedCount > 0).length;
   const dateLabel = ctx.summaryDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   const pills = [
-    `<span class="pill pill-ok">${fresh} submitted</span>`,
+    `<span class="pill pill-ok">✓ ${fresh} submitted</span>`,
     missing > 0
       ? `<span class="pill pill-warn">${missing} missing</span>`
-      : `<span class="pill pill-ok">${pct}% rate</span>`,
-    hrs > 0 ? `<span class="pill pill-neutral">~${hrs}h logged</span>` : "",
-    activeDepts > 0 ? `<span class="pill pill-neutral">${activeDepts} dept${activeDepts !== 1 ? "s" : ""} active</span>` : "",
+      : `<span class="pill pill-ok">✓ All in</span>`,
+    pct > 0 ? `<span class="pill pill-ok">📊 ${pct}% rate</span>` : "",
+    hrs > 0 ? `<span class="pill pill-neutral">⏱ ~${hrs}h logged</span>` : "",
   ].filter(Boolean).join("");
 
   return `<div class="pulse">
   <div class="pulse-label">⚡ Today's Pulse · ${dateLabel}</div>
-  <div class="pulse-headline">${data.todaysPulse ?? ""}</div>
-  <div class="pills">${pills}</div>
+  <div class="pulse-inner">
+    <div class="pulse-headline">${data.todaysPulse ?? ""}</div>
+  </div>
+  <div class="pulse-pills">${pills}</div>
 </div>`;
 }
 
@@ -696,11 +804,16 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 
   const notExpected = (data.departments ?? []).filter(d => d.notExpectedToday);
   const notExpectedBar = notExpected.length > 0
-    ? `<div class="not-expected-bar">${notExpected.map(d => `${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}`).join(" &nbsp;·&nbsp; ")}</div>` : "";
+    ? `<div style="margin-top:16px;">${notExpected.map(d => `<div class="placeholder">${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}</div>`).join("")}</div>` : "";
 
+  let personGlobalIdx = 0;
   const deptSections = (data.departments ?? [])
     .filter(d => !d.notExpectedToday)
-    .map(d => pdfDeptSection(d, ctx, c)).join("");
+    .map(d => {
+      const html = pdfDeptSection(d, ctx, c, personGlobalIdx);
+      personGlobalIdx += (d.people ?? []).length;
+      return html;
+    }).join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -725,13 +838,12 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
   </div>
   <div class="r">
     ${pdfPulse(data, ctx)}
-    ${pdfNeedsAttention(data, c)}
+    ${pdfNeedsAttention(data, c, ctx)}
     ${pdfNotableProgress(data, c)}
-    <div class="sec-label">👤 Individual reports</div>
     ${deptSections}
     ${notExpectedBar}
-    <div style="text-align:center;padding:1.5rem 0;border-top:.5px solid ${c.borderTertiary};margin-top:1rem">
-      <span style="font-size:11px;color:${c.textSecondary}">${orgName} · Confidential · Generated by OrgRise AI</span>
+    <div style="text-align:center;padding:24px 0 8px;border-top:0.5px solid rgba(255,255,255,0.06);margin-top:24px;">
+      <span style="font-size:11px;color:#475569;">${orgName} · Confidential · Generated by OrgRise AI</span>
     </div>
   </div>
 </div>
@@ -974,10 +1086,10 @@ function emailNotableProgress(data: AiSummaryData, c: Palette, e: ES): string {
 }
 
 function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES): string {
-  const cs = data.completenessScore ?? {};
-  const fresh = cs.freshToday ?? 0;
-  const pct = cs.percentage ?? 0;
-  const missing = (cs.missing ?? []).length;
+  const cs = data.completenessScore;
+  const fresh = cs?.freshToday ?? 0;
+  const pct = cs?.percentage ?? 0;
+  const missing = (cs?.missing ?? []).length;
   const hrs = totalHours(data);
   const activeDepts = (data.departments ?? []).filter(d => !d.notExpectedToday && d.reportedCount > 0).length;
   const dateLabel = ctx.summaryDate.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
