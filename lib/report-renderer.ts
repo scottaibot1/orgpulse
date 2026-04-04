@@ -1157,7 +1157,7 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
 </td></tr>`;
 }
 
-function emailNotableProgress(data: AiSummaryData, c: Palette, e: ES): string {
+function emailNotableProgress(data: AiSummaryData, c: Palette): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   let rows = "";
@@ -1288,7 +1288,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   <tr><td style="padding:20px 28px 8px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${emailNeedsAttention(data, c, e)}
-      ${emailNotableProgress(data, c, e)}
+      ${emailNotableProgress(data, c)}
       <tr><td style="padding:0 0 12px; font-family:Arial,Helvetica,sans-serif;"><div style="${e.secLabel}">👤 Individual reports</div></td></tr>
       ${deptRows}
       ${notExpectedRow}
