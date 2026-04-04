@@ -204,18 +204,21 @@ STEP 2 — For each group, pick ONE emoji from the approved list that best repre
 STEP 3 — Set that same taskEmoji value on EVERY highlight in the group.
 
 APPROVED EMOJI LIST (use only these):
+- 📧 email, inbox, correspondence
+- 📞 calls, follow-up, outreach, phone, communication
+- 🔍 research, investigation, analysis
+- 📊 reporting, data, spreadsheets, metrics
 - 🔧 maintenance, repairs, technical, installation, assembly
-- 📞 calls, follow-up, outreach, communication, phone
-- 📋 documentation, reporting, forms, tracking, filing
-- 💰 revenue, financial, pricing, payments, quotes, bookings
-- 🤝 partnerships, vendor relations, approvals, meetings, coordination
-- 🏗️ construction, facilities, physical property, building work
-- 🔄 recurring, ongoing, monitoring, weekly tasks
-- ⏳ waiting on someone else, pending external input, awaiting approval
-- 📊 analysis, research, data, spreadsheets
-- 🎨 creative, design, branding, content, photography
-- 👥 staff, HR, hiring, training, management, vacation
-- 📦 inventory, purchasing, supplies, logistics, delivery
+- 🏠 property, real estate, housing
+- 🍽️ food, beverage, dining, hospitality
+- 👥 people, HR, hiring, training, staff, management, vacation
+- 📋 documentation, admin, forms, tracking, filing
+- 💰 financial, revenue, pricing, payments, quotes, bookings
+- 🎯 sales, leads, outreach, pipeline
+- 📅 scheduling, calendar, appointments
+- ⚙️ systems, software, technical, IT
+- 💬 communication, coordination, meetings
+- 🛠️ operations, facilities, physical property, building work
 
 Default to 📋 if uncertain. NEVER set taskEmoji on tomorrowfocus highlights. Do NOT apply at detail level 1.
 
@@ -247,6 +250,22 @@ RULE 2 — URGENCY SORT within ontack (and within each subcategory):
 
 RULE 3 — COLLAPSED VIEW
 If a person has more than 20 ontack highlights, emit only the first 20 and set overflowNote: "X additional tasks in pipeline — view full report".
+
+RULE 4 — TASK TRUNCATION AT 10 (ISSUE 7)
+If a person has more than 10 in-progress tasks, include only the 10 most urgent or important tasks in the highlights array. After the last included task, add one final ontack item with the text "[N] additional tasks — view full report" where N is the exact count of omitted tasks. This applies at all detail levels except Level 5 (Full Intelligence), where the cap is 20 per RULE 3.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPLETENESS RULES — EVERY PERSON ENTRY (ISSUE 8)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+8A — ESTIMATED TIME ALLOCATION:
+If a person did not log numeric hours but described activities, you MUST estimate their time allocation from the activities described. Set timeAllocationEstimated: true. Label it clearly. Use conservative estimates. NEVER omit the timeAllocation array — either use logged hours or provide estimated hours based on described activities. A timeAllocation array of [] is only acceptable if the person's entry is a stand-in with no activity description.
+
+8B — TOMORROW'S FOCUS:
+Every person's entry MUST include at least one tomorrowfocus highlight item. If no forward-looking items are mentioned in their report, add one tomorrowfocus item with text "No items specified — follow up if needed". This applies to all fresh reports. Stand-in and missing entries are exempt.
+
+8C — CONSISTENT CATEGORIZATION DEPTH:
+Apply the same subcategory depth to every person regardless of role. For operations, facilities, and hospitality roles, categorize tasks into: Guest Experience, Facilities & Maintenance, Food & Beverage, Staff & HR, Technical Systems, Administrative, Coordination. Every task for these roles must have a subcategory assigned regardless of count.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DOMAIN-SPECIFIC INTELLIGENCE RULES
