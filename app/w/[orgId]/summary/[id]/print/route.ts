@@ -3,17 +3,38 @@ import { prisma } from "@/lib/prisma";
 import { getAuthEmail } from "@/lib/auth";
 import { marked } from "marked";
 import { parseAiSummary, renderPdfHtml } from "@/lib/report-renderer";
+import crypto from "crypto";
 
 interface Params { params: Promise<{ orgId: string; id: string }> }
 
-export async function GET(_req: NextRequest, { params }: Params) {
+function verifyPdfToken(token: string, summaryId: string, orgId: string): boolean {
+  try {
+    const decoded = Buffer.from(token, "base64url").toString();
+    const parts = decoded.split(":");
+    if (parts.length !== 4) return false;
+    const [sid, oid, expires, sig] = parts;
+    const secret = process.env.PDF_TOKEN_SECRET || process.env.RESEND_API_KEY || "orgrise-pdf-fallback";
+    const expectedSig = crypto.createHmac("sha256", secret).update(`${sid}:${oid}:${expires}`).digest("hex").slice(0, 16);
+    return sig === expectedSig && parseInt(expires) > Date.now() && sid === summaryId && oid === orgId;
+  } catch {
+    return false;
+  }
+}
+
+export async function GET(req: NextRequest, { params }: Params) {
   const { orgId, id } = await params;
+  const { searchParams } = new URL(req.url);
+  const token = searchParams.get("token");
 
-  const email = await getAuthEmail();
-  if (!email) return new NextResponse("Unauthorized", { status: 401 });
+  // Token-based access — bypass auth for valid signed tokens (used in email links)
+  const tokenValid = token ? verifyPdfToken(token, id, orgId) : false;
 
-  const member = await prisma.user.findUnique({ where: { orgId_email: { orgId, email } } });
-  if (!member) return new NextResponse("Forbidden", { status: 403 });
+  if (!tokenValid) {
+    const email = await getAuthEmail();
+    if (!email) return new NextResponse("Unauthorized", { status: 401 });
+    const member = await prisma.user.findUnique({ where: { orgId_email: { orgId, email } } });
+    if (!member) return new NextResponse("Forbidden", { status: 403 });
+  }
 
   const [summary, org] = await Promise.all([
     prisma.dailySummary.findFirst({

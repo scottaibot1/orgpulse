@@ -4,6 +4,15 @@ import { getWorkspaceUser } from "@/lib/auth";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
+import crypto from "crypto";
+
+function generatePdfToken(summaryId: string, orgId: string): string {
+  const secret = process.env.PDF_TOKEN_SECRET || process.env.RESEND_API_KEY || "orgrise-pdf-fallback";
+  const expires = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
+  const data = `${summaryId}:${orgId}:${expires}`;
+  const sig = crypto.createHmac("sha256", secret).update(data).digest("hex").slice(0, 16);
+  return Buffer.from(`${data}:${sig}`).toString("base64url");
+}
 
 export const maxDuration = 300;
 interface Params { params: Promise<{ orgId: string }> }
@@ -365,21 +374,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
     emailTo = org.ownerEmail;
     try {
-      // Attempt to fetch the PDF from the print route for email attachment
-      let pdfBuffer: Buffer | undefined;
-      const pdfUrl = `${appUrl}/w/${orgId}/summary/${saved.id}/print`;
-      try {
-        const pdfRes = await fetch(pdfUrl);
-        if (pdfRes.ok && pdfRes.headers.get("content-type")?.includes("application/pdf")) {
-          pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
-          console.log(`[Summary] PDF fetched for attachment: ${pdfBuffer.byteLength} bytes`);
-        } else {
-          console.warn(`[Summary] PDF fetch returned ${pdfRes.status} — skipping attachment`);
-        }
-      } catch (pdfFetchErr) {
-        console.warn("[Summary] PDF fetch failed — skipping attachment:", pdfFetchErr);
-      }
-
+      const pdfToken = generatePdfToken(saved.id, orgId);
       await sendSummaryEmail({
         toEmail: org.ownerEmail,
         orgName: org.name,
@@ -392,7 +387,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         markdown: saved.aiFullSummary!,
         appUrl,
         theme: reportTheme,
-        pdfBuffer,
+        pdfToken,
       });
       emailSent = true;
       console.log(`[Summary] Email sent to ${org.ownerEmail} for org ${org.name} (${orgId})`);

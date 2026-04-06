@@ -1372,20 +1372,19 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
           </tr>
           </table>
         </td></tr>
-        ${outlookAttnSummary}
-        ${outlookProgress}
-        <!-- Prominent CTA -->
-        <tr><td style="padding:24px 0 8px; text-align:center; font-family:Arial,Helvetica,sans-serif;">
-          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; margin-bottom:12px;">The full detailed report is attached as a PDF and available online:</div>
+        <!-- Prominent CTA — first, right after stats -->
+        <tr><td style="padding:8px 0 16px; text-align:center; font-family:Arial,Helvetica,sans-serif;">
           ${pdfUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td>
             <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#4f46e5" style="background-color:#4f46e5;"><tr>
-              <td style="padding:14px 32px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif;">
-                <a href="${pdfUrl}" style="color:#ffffff; text-decoration:none; font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; font-family:Arial,Helvetica,sans-serif;">View Full Report Online &#8594;</a>
+              <td style="padding:16px 40px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif;">
+                <a href="${pdfUrl}" style="color:#ffffff; text-decoration:none; font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:700; font-family:Arial,Helvetica,sans-serif;">View Full Report Online &#8594;</a>
               </td>
             </tr></table>
           </td></tr></table>` : ""}
-          <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#475569; font-family:Arial,Helvetica,sans-serif; margin-top:10px;">&#128206; PDF report also attached to this email</div>
+          <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#475569; font-family:Arial,Helvetica,sans-serif; margin-top:10px;">PDF report also attached to this email</div>
         </td></tr>
+        ${outlookAttnSummary}
+        ${outlookProgress}
       </table>
     </td></tr>`;
 
