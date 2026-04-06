@@ -1283,110 +1283,20 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const pdfCta = pdfUrl
     ? `<tr><td style="text-align:center; padding:16px 0 8px; font-family:Arial,Helvetica,sans-serif;"><a href="${pdfUrl}" style="display:inline-block; background:#4f46e5; color:#fff; text-decoration:none; font-size:13px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; padding:11px 26px; border-radius:8px; -webkit-border-radius:8px; font-family:Arial,Helvetica,sans-serif;">View &amp; Download Full PDF Report</a></td></tr>` : "";
 
-  // ── Outlook-only executive brief ──
-  const cs = data.completenessScore;
-  const fresh = cs?.freshToday ?? 0;
-  const pct = cs?.percentage ?? 0;
-  const hrs = totalHours(data);
-  const activeDepts = (data.departments ?? []).filter(d => !d.notExpectedToday && d.reportedCount > 0).length;
-
-  const needsAttnCount = (data.needsAttentionNow ?? []).length;
-  const overdueCount = (data.needsAttentionNow ?? []).filter(i => i.status === "overdue").length;
-
-  let outlookAttnSummary = "";
-  if (needsAttnCount > 0) {
-    const topItems = (data.needsAttentionNow ?? []).slice(0, 5);
-    let attnRows = "";
-    for (const item of topItems) {
-      const isOverdue = item.status === "overdue";
-      const badgeColor = isOverdue ? "#fca5a5" : "#fcd34d";
-      const badgeBg = isOverdue ? "#7f1d1d" : "#78350f";
-      const badgeText = isOverdue ? `OVERDUE${item.daysOverdue ? " " + item.daysOverdue + "d" : ""}` : "DUE SOON";
-      attnRows += `<tr>
-  <td style="padding:8px 0; border-bottom:1px solid #1e293b; font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-      <td width="90" valign="top" style="padding-right:10px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td style="background-color:${badgeBg}; color:${badgeColor}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 8px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${badgeText}</td>
-        </tr></table>
-      </td>
-      <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:#e2e8f0; font-family:Arial,Helvetica,sans-serif;">${item.text}</td>
-    </tr></table>
-  </td>
-</tr>`;
-    }
-    if (needsAttnCount > 5) {
-      attnRows += `<tr><td style="padding:8px 0; font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; font-style:italic;">${needsAttnCount - 5} more items — see full report</td></tr>`;
-    }
-    outlookAttnSummary = `
-    <tr><td style="padding:20px 0 8px; font-family:Arial,Helvetica,sans-serif;">
-      <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em; font-family:Arial,Helvetica,sans-serif; margin-bottom:10px;">🔥 NEEDS ATTENTION — ${overdueCount} OVERDUE</div>
-      <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#334155" width="100%" style="background-color:#1e293b;">
-      <tr><td style="padding:8px 16px; background-color:#1e293b; font-family:Arial,Helvetica,sans-serif;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${attnRows}</table>
-      </td></tr>
-      </table>
-    </td></tr>`;
-  }
-
-  const progressGroups = normalizeProgress(data.notableProgress);
-  let outlookProgress = "";
-  if (progressGroups.length > 0) {
-    const totalItems = progressGroups.reduce((s, g) => s + (g.items?.length ?? 0), 0);
-    const deptList = progressGroups.filter(g => g.department).map(g => g.department).join(", ");
-    outlookProgress = `
-    <tr><td style="padding:16px 0 8px; font-family:Arial,Helvetica,sans-serif;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#166534" width="100%" style="background-color:#0d2818;">
-      <tr><td style="padding:14px 16px; background-color:#0d2818; font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:600; color:#4ade80; text-transform:uppercase; letter-spacing:0.08em; font-family:Arial,Helvetica,sans-serif; margin-bottom:6px;">🏆 NOTABLE PROGRESS</div>
-        <div style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:#d1fae5; font-family:Arial,Helvetica,sans-serif;">${totalItems} tasks completed across ${deptList}</div>
-      </td></tr>
-      </table>
-    </td></tr>`;
-  }
-
-  const outlookBrief = `
-    <!-- OUTLOOK-ONLY: Executive Brief -->
-    <tr><td style="padding:24px 28px 8px; font-family:Arial,Helvetica,sans-serif;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-        <!-- Stats bar -->
-        <tr><td style="padding:0 0 16px; font-family:Arial,Helvetica,sans-serif;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            <td width="25%" align="center" style="padding:12px 4px; font-family:Arial,Helvetica,sans-serif;">
-              <div style="font-size:24px; line-height:28px; mso-line-height-rule:exactly; font-weight:700; color:#86efac; font-family:Arial,Helvetica,sans-serif;">${fresh}</div>
-              <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#64748b; text-transform:uppercase; font-family:Arial,Helvetica,sans-serif;">Submitted</div>
-            </td>
-            <td width="25%" align="center" style="padding:12px 4px; font-family:Arial,Helvetica,sans-serif;">
-              <div style="font-size:24px; line-height:28px; mso-line-height-rule:exactly; font-weight:700; color:#86efac; font-family:Arial,Helvetica,sans-serif;">${pct}%</div>
-              <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#64748b; text-transform:uppercase; font-family:Arial,Helvetica,sans-serif;">Rate</div>
-            </td>
-            <td width="25%" align="center" style="padding:12px 4px; font-family:Arial,Helvetica,sans-serif;">
-              <div style="font-size:24px; line-height:28px; mso-line-height-rule:exactly; font-weight:700; color:#94a3b8; font-family:Arial,Helvetica,sans-serif;">~${hrs}h</div>
-              <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#64748b; text-transform:uppercase; font-family:Arial,Helvetica,sans-serif;">Logged</div>
-            </td>
-            <td width="25%" align="center" style="padding:12px 4px; font-family:Arial,Helvetica,sans-serif;">
-              <div style="font-size:24px; line-height:28px; mso-line-height-rule:exactly; font-weight:700; color:#94a3b8; font-family:Arial,Helvetica,sans-serif;">${activeDepts}</div>
-              <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:#64748b; text-transform:uppercase; font-family:Arial,Helvetica,sans-serif;">Depts</div>
-            </td>
-          </tr>
-          </table>
-        </td></tr>
-        <!-- Prominent CTA — first, right after stats -->
-        <tr><td style="padding:8px 0 16px; text-align:center; font-family:Arial,Helvetica,sans-serif;">
-          ${pdfUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td>
-            <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#4f46e5" style="background-color:#4f46e5;"><tr>
-              <td style="padding:16px 40px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif;">
-                <a href="${pdfUrl}" style="color:#ffffff; text-decoration:none; font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:700; font-family:Arial,Helvetica,sans-serif;">View Full Report Online &#8594;</a>
-              </td>
-            </tr></table>
-          </td></tr></table>` : ""}
-          <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#475569; font-family:Arial,Helvetica,sans-serif; margin-top:10px;">PDF report also attached to this email</div>
-        </td></tr>
-        ${outlookAttnSummary}
-        ${outlookProgress}
-      </table>
-    </td></tr>`;
+  // ── Outlook-only: just the pulse text and a big PDF button ──
+  const outlookPulseAndButton = `
+  <tr><td style="background-color:#0f172a; padding:24px 28px 28px; font-family:Arial,Helvetica,sans-serif;">
+    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; color:#f59e0b; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; font-family:Arial,Helvetica,sans-serif;">&#9889; Today's Pulse</div>
+    <div style="font-size:16px; line-height:26px; mso-line-height-rule:exactly; font-weight:500; color:#f1f5f9; font-family:Arial,Helvetica,sans-serif; margin-bottom:24px;">${data.todaysPulse ?? ""}</div>
+    ${pdfUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%"><tr><td align="center">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#4f46e5" style="background-color:#4f46e5;"><tr>
+        <td style="padding:16px 40px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif; text-align:center;">
+          <a href="${pdfUrl}" style="color:#ffffff; text-decoration:none; font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; font-family:Arial,Helvetica,sans-serif;">View Full Report &#8594;</a>
+        </td>
+      </tr></table>
+    </td></tr></table>` : ""}
+    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; text-align:center; margin-top:12px;">Your full executive summary with detailed individual reports is available at the link above.</div>
+  </td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1415,10 +1325,11 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <tr><td style="width:700px; padding:0;">
 <![endif]-->
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:#0f172a;">
-  <!-- HEADER — same for both -->
+
+  <!-- ═══ HEADER — both clients see this ═══ -->
   <tr><td style="background-color:#1e293b; padding:20px 28px 16px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-      <td valign="top" style="font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
+      <td valign="top" style="font-family:Arial,Helvetica,sans-serif;">
         <div style="font-size:17px; line-height:24px; mso-line-height-rule:exactly; font-weight:700; color:#ffffff; font-family:Arial,Helvetica,sans-serif;">${orgName}</div>
         <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.45); margin-top:3px; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif;">Executive Summary</div>
       </td>
@@ -1427,14 +1338,15 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
       </td>
     </tr></table>
   </td></tr>
-  <!-- TODAY'S PULSE — same for both -->
-  ${emailPulse(data, ctx, c, e)}
-  <!-- ═══════════ OUTLOOK ONLY: Executive Brief ═══════════ -->
+
+  <!-- ═══ OUTLOOK ONLY — pulse headline + big PDF button, nothing else ═══ -->
   <!--[if mso]>
-  ${outlookBrief}
+  ${outlookPulseAndButton}
   <![endif]-->
-  <!-- ═══════════ NON-OUTLOOK: Full Detailed Report ═══════════ -->
+
+  <!-- ═══ NON-OUTLOOK — full detailed report ═══ -->
   <!--[if !mso]><!-->
+  ${emailPulse(data, ctx, c, e)}
   <tr><td style="padding:20px 28px 8px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${emailNeedsAttention(data, c, e)}
@@ -1446,7 +1358,8 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     </table>
   </td></tr>
   <!--<![endif]-->
-  <!-- FOOTER — same for both -->
+
+  <!-- ═══ FOOTER — both clients see this ═══ -->
   <tr><td style="padding:14px 28px; border-top:1px solid #1e293b; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif;">${orgName} · Confidential</td>

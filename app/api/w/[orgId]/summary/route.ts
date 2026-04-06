@@ -4,15 +4,6 @@ import { getWorkspaceUser } from "@/lib/auth";
 import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
-import crypto from "crypto";
-
-function generatePdfToken(summaryId: string, orgId: string): string {
-  const secret = process.env.PDF_TOKEN_SECRET || process.env.RESEND_API_KEY || "orgrise-pdf-fallback";
-  const expires = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days
-  const data = `${summaryId}:${orgId}:${expires}`;
-  const sig = crypto.createHmac("sha256", secret).update(data).digest("hex").slice(0, 16);
-  return Buffer.from(`${data}:${sig}`).toString("base64url");
-}
 
 export const maxDuration = 300;
 interface Params { params: Promise<{ orgId: string }> }
@@ -374,7 +365,6 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
     emailTo = org.ownerEmail;
     try {
-      const pdfToken = generatePdfToken(saved.id, orgId);
       await sendSummaryEmail({
         toEmail: org.ownerEmail,
         orgName: org.name,
@@ -387,7 +377,6 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         markdown: saved.aiFullSummary!,
         appUrl,
         theme: reportTheme,
-        pdfToken,
       });
       emailSent = true;
       console.log(`[Summary] Email sent to ${org.ownerEmail} for org ${org.name} (${orgId})`);

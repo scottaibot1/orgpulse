@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { parseAiSummary, renderEmailHtml } from "@/lib/report-renderer";
+import { generatePdfToken } from "@/lib/pdf-token";
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY not set");
@@ -20,7 +21,6 @@ export async function sendSummaryEmail({
   appUrl,
   theme,
   reportLinks,
-  pdfToken,
 }: {
   toEmail: string;
   orgName: string;
@@ -33,10 +33,9 @@ export async function sendSummaryEmail({
   appUrl: string;
   theme?: "dark" | "light";
   reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }>;
-  pdfToken?: string;
 }) {
-  const basePdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print`;
-  const pdfUrl = pdfToken ? `${basePdfUrl}?token=${pdfToken}` : basePdfUrl;
+  const pdfToken = generatePdfToken(summaryId, orgId);
+  const pdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print?token=${pdfToken}`;
   const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl, appUrl, theme, reportLinks };
 
   // Try new structured JSON format first; fall back to legacy markdown for old records

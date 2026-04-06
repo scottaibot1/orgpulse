@@ -33,6 +33,8 @@ export async function middleware(request: NextRequest) {
 
   // Allow public routes
   const publicPaths = ["/login", "/signup", "/submit", "/setup", "/report"];
+  // Allow print routes with a signed token — token is verified inside the route handler
+  const hasPdfToken = pathname.includes("/print") && request.nextUrl.searchParams.has("token");
   const isPublic =
     pathname === "/" ||
     publicPaths.some((p) => pathname.startsWith(p)) ||
@@ -40,7 +42,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/setup") ||
     pathname.startsWith("/api/reports") ||
-    pathname.startsWith("/api/submit");
+    pathname.startsWith("/api/submit") ||
+    hasPdfToken;
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
