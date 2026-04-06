@@ -869,7 +869,11 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
     </div>
   </div>
 </div>
-<script>setTimeout(()=>window.print(),400);</script>
+<script>
+  if (!new URLSearchParams(window.location.search).has('token')) {
+    setTimeout(()=>window.print(),400);
+  }
+</script>
 </body>
 </html>`;
 }
@@ -1283,11 +1287,21 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   const pdfCta = pdfUrl
     ? `<tr><td style="text-align:center; padding:16px 0 8px; font-family:Arial,Helvetica,sans-serif;"><a href="${pdfUrl}" style="display:inline-block; background:#4f46e5; color:#fff; text-decoration:none; font-size:13px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; padding:11px 26px; border-radius:8px; -webkit-border-radius:8px; font-family:Arial,Helvetica,sans-serif;">View &amp; Download Full PDF Report</a></td></tr>` : "";
 
-  // ── Outlook-only: just the pulse text and a big PDF button ──
+  const cs = data.completenessScore;
+  const fresh = cs?.freshToday ?? 0;
+
+  // ── Outlook-only: status line + big PDF button ──
   const outlookPulseAndButton = `
-  <tr><td style="background-color:#0f172a; padding:24px 28px 28px; font-family:Arial,Helvetica,sans-serif;">
-    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; color:#f59e0b; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; font-family:Arial,Helvetica,sans-serif;">&#9889; Today's Pulse</div>
-    <div style="font-size:16px; line-height:26px; mso-line-height-rule:exactly; font-weight:500; color:#f1f5f9; font-family:Arial,Helvetica,sans-serif; margin-bottom:24px;">${data.todaysPulse ?? ""}</div>
+  <tr><td style="background-color:#0f172a; padding:28px 28px 32px; font-family:Arial,Helvetica,sans-serif;">
+    <!-- Status line -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
+    <tr>
+      <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:#94a3b8; font-family:Arial,Helvetica,sans-serif;">
+        ${fresh} of ${cs?.totalExpected ?? fresh} reported &nbsp;&#183;&nbsp; ${formattedDate}
+      </td>
+    </tr>
+    </table>
+    <!-- Big CTA button -->
     ${pdfUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%"><tr><td align="center">
       <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#4f46e5" style="background-color:#4f46e5;"><tr>
         <td style="padding:16px 40px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif; text-align:center;">
@@ -1295,7 +1309,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
         </td>
       </tr></table>
     </td></tr></table>` : ""}
-    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; text-align:center; margin-top:12px;">Your full executive summary with detailed individual reports is available at the link above.</div>
+    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; text-align:center; margin-top:14px;">Your full executive summary with detailed reports for each team member is available at the link above.</div>
   </td></tr>`;
 
   return `<!DOCTYPE html>
