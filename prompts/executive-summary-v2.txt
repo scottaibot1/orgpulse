@@ -24,12 +24,13 @@ Department ordering:
 - If departmentOrdering is "manual" and departmentOrder is provided, present departments in that exact order throughout.
 - If departmentOrdering is "ai_determined", lead with departments having the most urgent items in needsAttentionNow.
 
-Detail level guide:
-- Level 1 = Pulse Only: Output todaysPulse + needsAttentionNow + completenessScore. departments array must be [] (empty). No individual sections. No notableProgress.
-- Level 2 = Brief: Output todaysPulse + needsAttentionNow + notableProgress + completenessScore. departments array must be [] (empty). No individual person sections.
-- Level 3 = Standard (default): Full output. Individual sections included. 2–4 ontack highlights per person maximum. Include tomorrowfocus if present. Time allocation: include if explicitly reported, omit if not.
-- Level 4 = Detailed: Full output. 3–6 ontack highlights per person. Include time allocation for every person (estimate if not explicit — set timeAllocationEstimated: true). Apply subcategory grouping for ops roles regardless of count.
-- Level 5 = Full Intelligence: Full output. Every task. Every data point. No cap on ontack highlights (still max 20 per person per RULE 3). All time allocation. All subcategories.
+Detail level guide (3 levels total):
+
+- Level 1 = PULSE: Minimal free-form summary. Output todaysPulse only as a 2-3 sentence narrative paragraph. Do NOT output departments (use empty array). Do NOT output needsAttentionNow, notableProgress, or individual person sections. Output completenessScore with totalExpected and freshToday. This level is for users who want a lightweight daily heartbeat without structured analysis. The todaysPulse sentence should cover: who reported, what happened at a high level, and any obvious concern. Example: "Alan, Antonio, Bella, and Arturo all reported in today. Reservations cleared a VRBO capacity violation and Sales advanced two hot leads toward decisions. Arturo continues to carry multiple overdue Private Paradise maintenance items." That is the entire output at Level 1 — one narrative paragraph plus completenessScore.
+
+- Level 2 = STANDARD (default): Full structured output. Include todaysPulse, needsAttentionNow, waitingOnExternal, notableProgress, completenessScore, and departments with individual person sections. Cap ontack highlights at 6 per person. Include tomorrowfocus items. Include time allocation if explicitly reported OR if the person did not log hours (estimate in that case, set timeAllocationEstimated: true). Apply subcategory grouping for operations/property management roles regardless of count. This is the default experience — balanced detail, actionable, not overwhelming.
+
+- Level 3 = FULL INTELLIGENCE: Same structure as Level 2 but unrestricted detail. No cap on ontack highlights except the max 20 per person from RULE 3. Include every task and every data point from every report. All time allocation. All subcategories for all roles. Full pipeline breakdowns. Every waiting-on-external item. Every stall detected. Every blocker. This is the "executive briefing deep dive" tier for users who want nothing left out.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — BUILD THREE ORG-LEVEL SECTIONS FIRST

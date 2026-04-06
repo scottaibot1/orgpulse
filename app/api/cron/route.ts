@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
-import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
+import { generateExecutiveSummaryV2, normalizeDetailLevel, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
 
@@ -62,7 +62,7 @@ async function runCronWork(): Promise<void> {
     try {
       const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
       const apiKey = org.workspaceSettings?.anthropicApiKey ?? null;
-      const autoReportDetailLevel = (org.workspaceSettings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? (org.workspaceSettings as { reportDetailLevel?: number } | null)?.reportDetailLevel ?? 3;
+      const autoReportDetailLevel = normalizeDetailLevel((org.workspaceSettings as { autoReportDetailLevel?: number } | null)?.autoReportDetailLevel ?? (org.workspaceSettings as { reportDetailLevel?: number } | null)?.reportDetailLevel);
       const departmentOrdering = (org.workspaceSettings as { departmentOrdering?: string } | null)?.departmentOrdering ?? "manual";
       const biweeklyStartDate = (org.workspaceSettings as { biweeklyStartDate?: Date | null } | null)?.biweeklyStartDate ?? null;
       const reportTheme = ((org.workspaceSettings as { reportTheme?: string } | null)?.reportTheme ?? "dark") as "dark" | "light";
@@ -187,7 +187,7 @@ async function runCronWork(): Promise<void> {
         const daysSinceReport = activeReport ? Math.floor((today.getTime() - new Date(activeReport.date).getTime()) / (1000 * 60 * 60 * 24)) : -1;
 
         let builtNarrative = narrative?.currentNarrative ?? activeReport?.aiSummary ?? "No report data available.";
-        if (autoReportDetailLevel >= 3 && activeReport?.structuredData) {
+        if (autoReportDetailLevel >= 2 && activeReport?.structuredData) {
           const sd = activeReport.structuredData as {
             summary?: string;
             tasks?: {

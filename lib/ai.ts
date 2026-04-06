@@ -758,6 +758,13 @@ export interface CompletenessScore {
   notScheduledToday?: { name: string }[];
 }
 
+export function normalizeDetailLevel(level: number | undefined | null): 1 | 2 | 3 {
+  if (level == null) return 2;
+  if (level <= 1) return 1;
+  if (level <= 3) return 2;
+  return 3;
+}
+
 export async function generateExecutiveSummaryV2(context: {
   apiKey?: string | null;
   orgName: string;

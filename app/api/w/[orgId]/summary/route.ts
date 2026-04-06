@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getWorkspaceUser } from "@/lib/auth";
-import { generateExecutiveSummaryV2, type CompletenessScore } from "@/lib/ai";
+import { generateExecutiveSummaryV2, normalizeDetailLevel, type CompletenessScore } from "@/lib/ai";
 import { sendSummaryEmail } from "@/lib/email";
 import { isPersonDueToday, buildScheduleLabel } from "@/lib/schedule";
 
@@ -52,7 +52,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
 
   const apiKey = org.workspaceSettings?.anthropicApiKey ?? null;
   const scope = org.workspaceSettings?.reportCollectionScope ?? "everyone";
-  const reportDetailLevel = org.workspaceSettings?.reportDetailLevel ?? 3;
+  const reportDetailLevel = normalizeDetailLevel(org.workspaceSettings?.reportDetailLevel);
   const departmentOrdering = org.workspaceSettings?.departmentOrdering ?? "manual";
   const reportTheme = (org.workspaceSettings?.reportTheme ?? "dark") as "dark" | "light";
 
@@ -226,7 +226,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     // For detail level 3+, build a rich narrative from structured task data if available
     let builtNarrative = narrative?.currentNarrative ?? activeReport?.aiSummary ?? "No report data available.";
 
-    if (reportDetailLevel >= 3 && activeReport?.structuredData) {
+    if (reportDetailLevel >= 2 && activeReport?.structuredData) {
       const sd = activeReport.structuredData as {
         summary?: string;
         tasks?: {
