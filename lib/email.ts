@@ -20,6 +20,7 @@ export async function sendSummaryEmail({
   appUrl,
   theme,
   reportLinks,
+  pdfBuffer,
 }: {
   toEmail: string;
   orgName: string;
@@ -32,6 +33,7 @@ export async function sendSummaryEmail({
   appUrl: string;
   theme?: "dark" | "light";
   reportLinks?: Record<string, { parsedReportId: string; date: string; isStandIn: boolean; fileUrl?: string | null }>;
+  pdfBuffer?: Buffer;
 }) {
   const pdfUrl = `${appUrl}/w/${orgId}/summary/${summaryId}/print`;
   const ctx = { orgName, summaryDate, totalSubmissions, missingSubmissions, createdAt: new Date(), pdfUrl, appUrl, theme, reportLinks };
@@ -93,11 +95,18 @@ export async function sendSummaryEmail({
 
   const subject = `${orgName} Executive Summary — ${summaryDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 
+  const shortDate = summaryDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).replace(/,?\s+/g, "-");
+  const attachments = pdfBuffer ? [{
+    filename: `${orgName.replace(/[^a-zA-Z0-9]/g, "-")}-Executive-Summary-${shortDate}.pdf`,
+    content: pdfBuffer,
+  }] : undefined;
+
   const { error } = await getResend().emails.send({
     from: FROM,
     to: toEmail,
     subject,
     html,
+    ...(attachments ? { attachments } : {}),
   });
 
   if (error) throw new Error(`Email send failed: ${error.message}`);

@@ -338,20 +338,35 @@ async function runCronWork(): Promise<void> {
       if (org.ownerEmail && process.env.RESEND_API_KEY) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
         console.log(`[Cron] ${org.name}: Sending email to ${org.ownerEmail}…`);
-        sendSummaryEmail({
-          toEmail: org.ownerEmail,
-          orgName: org.name,
-          summaryDate: today,
-          summaryId: savedSummary.id,
-          orgId: org.id,
-          totalSubmissions: freshCount,
-          missingSubmissions: dueTodayUsers.length - freshCount,
-          markdown: summaryText,
-          appUrl,
-          theme: reportTheme,
-        }).then(() => {
-          console.log(`[Cron] ${org.name}: Email sent to ${org.ownerEmail}`);
-        }).catch((e) => console.error(`[Cron] ${org.name}: Email failed for ${org.ownerEmail}:`, e));
+        // Attempt to fetch the PDF from the print route for email attachment
+        const pdfUrl = `${appUrl}/w/${org.id}/summary/${savedSummary.id}/print`;
+        fetch(pdfUrl)
+          .then(async (pdfRes) => {
+            let pdfBuffer: Buffer | undefined;
+            if (pdfRes.ok && pdfRes.headers.get("content-type")?.includes("application/pdf")) {
+              pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+              console.log(`[Cron] ${org.name}: PDF fetched for attachment: ${pdfBuffer.byteLength} bytes`);
+            } else {
+              console.warn(`[Cron] ${org.name}: PDF fetch returned ${pdfRes.status} — skipping attachment`);
+            }
+            return sendSummaryEmail({
+              toEmail: org.ownerEmail!,
+              orgName: org.name,
+              summaryDate: today,
+              summaryId: savedSummary.id,
+              orgId: org.id,
+              totalSubmissions: freshCount,
+              missingSubmissions: dueTodayUsers.length - freshCount,
+              markdown: summaryText,
+              appUrl,
+              theme: reportTheme,
+              pdfBuffer,
+            });
+          })
+          .then(() => {
+            console.log(`[Cron] ${org.name}: Email sent to ${org.ownerEmail}`);
+          })
+          .catch((e) => console.error(`[Cron] ${org.name}: Email failed for ${org.ownerEmail}:`, e));
       } else {
         if (!org.ownerEmail) console.warn(`[Cron] ${org.name}: No ownerEmail — skipping email`);
         if (!process.env.RESEND_API_KEY) console.warn(`[Cron] ${org.name}: RESEND_API_KEY not set — skipping email`);

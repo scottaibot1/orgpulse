@@ -365,6 +365,21 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${process.env.VERCEL_URL ?? "localhost:3000"}`;
     emailTo = org.ownerEmail;
     try {
+      // Attempt to fetch the PDF from the print route for email attachment
+      let pdfBuffer: Buffer | undefined;
+      const pdfUrl = `${appUrl}/w/${orgId}/summary/${saved.id}/print`;
+      try {
+        const pdfRes = await fetch(pdfUrl);
+        if (pdfRes.ok && pdfRes.headers.get("content-type")?.includes("application/pdf")) {
+          pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
+          console.log(`[Summary] PDF fetched for attachment: ${pdfBuffer.byteLength} bytes`);
+        } else {
+          console.warn(`[Summary] PDF fetch returned ${pdfRes.status} — skipping attachment`);
+        }
+      } catch (pdfFetchErr) {
+        console.warn("[Summary] PDF fetch failed — skipping attachment:", pdfFetchErr);
+      }
+
       await sendSummaryEmail({
         toEmail: org.ownerEmail,
         orgName: org.name,
@@ -377,6 +392,7 @@ async function handleSummaryPost(req: NextRequest, { orgId }: { orgId: string })
         markdown: saved.aiFullSummary!,
         appUrl,
         theme: reportTheme,
+        pdfBuffer,
       });
       emailSent = true;
       console.log(`[Summary] Email sent to ${org.ownerEmail} for org ${org.name} (${orgId})`);
