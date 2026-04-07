@@ -127,10 +127,14 @@ export default function DashboardReportsWidget({ reports: initialReports, orgId,
     // Always include current week even if no reports
     if (!byWeek.has(thisWeekMonday)) byWeek.set(thisWeekMonday, new Set());
 
-    // Ensure all 7 days of each week exist as keys (even if empty)
+    // Ensure days of each week exist as keys (even if empty).
+    // For the current week, only include days up to and including today.
+    // For past weeks, include all 7 days.
     for (const [mon, days] of Array.from(byWeek)) {
+      const isCurrentWeek = mon === thisWeekMonday;
       for (let i = 0; i < 7; i++) {
         const day = addDays(mon, i);
+        if (isCurrentWeek && day > today) continue;
         days.add(day);
         if (!byDay.has(day)) byDay.set(day, []);
       }
