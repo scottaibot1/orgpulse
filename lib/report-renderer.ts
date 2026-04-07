@@ -161,38 +161,55 @@ const C_DARK: Palette = {
 };
 
 const C_LIGHT: Palette = {
-  pageBodyBg:        "#f8fafc",
-  pageBg:            "#ffffff",
-  navy:              "#f1f5f9",
-  bgPrimary:         "#ffffff",
-  bgSecondary:       "#f8fafc",
-  bgPct:             "#f1f5f9",
-  bgSuccess:         "#dcfce7",
+  // Backgrounds — layered grays with subtle warmth
+  pageBodyBg:        "#f1f5f9",   // Cool gray page background
+  pageBg:            "#ffffff",   // Card containers
+  navy:              "#1e293b",   // Header bar — DARK navy header on light body
+  bgPrimary:         "#ffffff",   // Person card background
+  bgSecondary:       "#f8fafc",   // Subtle alternate background for nested sections
+  bgPct:             "#e0e7ff",   // Indigo-tinted percentage badge
+
+  // Status backgrounds — saturated, not pastel
+  bgSuccess:         "#d1fae5",
   bgWarning:         "#fef3c7",
   bgDanger:          "#fee2e2",
-  bgProgress:        "#f0fdf4",
-  borderTertiary:    "#e2e8f0",
-  borderSuccess:     "#bbf7d0",
-  borderProgress:    "#bbf7d0",
+  bgProgress:        "#ecfdf5",   // Faint mint for notable progress
+
+  // Borders — visible, not ghosts
+  borderTertiary:    "#cbd5e1",
+  borderSuccess:     "#86efac",
+  borderProgress:    "#86efac",
+
+  // Text — near-black for primary, real grays for secondary
   textPrimary:       "#0f172a",
-  textSecondary:     "#475569",
+  textSecondary:     "#334155",
   textTertiary:      "#64748b",
-  textInfo:          "#4f46e5",
+  textInfo:          "#4338ca",   // DEEP indigo
   textSuccess:       "#15803d",
-  textWarning:       "#92400e",
-  textDanger:        "#991b1b",
+  textWarning:       "#b45309",   // Burnt amber
+  textDanger:        "#b91c1c",   // Rich red
   textProgress:      "#14532d",
   textProgressLabel: "#15803d",
   textDue:           "#64748b",
-  textDueOd:         "#dc2626",
-  textDueUrgent:     "#d97706",
+  textDueOd:         "#b91c1c",
+  textDueUrgent:     "#b45309",
+
   radiusLg:          "12px",
   radiusMd:          "8px",
-  bullet: "#4f46e5", bar1: "#4f46e5", bar2: "#059669", bar3: "#d97706", bar4: "#7c3aed", bar5: "#64748b",
-  headerAccent:       "#eef2ff",
-  headerAccentBorder: "#6366f1",
-  headerAccentText:   "#4338ca",
-  buttonBg:           "#4f46e5",
+
+  // Bullet and bar colors — deeper, more saturated
+  bullet:            "#4338ca",
+  bar1:              "#4338ca",
+  bar2:              "#059669",
+  bar3:              "#d97706",
+  bar4:              "#7c3aed",
+  bar5:              "#475569",
+
+  // Header accents — dark header on light card (premium contrast)
+  headerAccent:       "#1e293b",  // Dark slate header background
+  headerAccentBorder: "#4338ca",  // Indigo accent border
+  headerAccentText:   "#e2e8f0",  // Light text on dark header
+  buttonBg:           "#4338ca",
   buttonText:         "#ffffff",
 };
 
@@ -511,8 +528,9 @@ function buildE(c: Palette) {
     personMeta:   `font-size:12px;line-height:16px;mso-line-height-rule:exactly;color:${c.textTertiary};font-family:Arial,Helvetica,sans-serif;margin-top:2px;`,
     catLabel:     `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;font-family:Arial,Helvetica,sans-serif;display:block;margin:14px 0 5px;`,
     subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
-    taskFont:     `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#e2e8f0;font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
+    taskFont:     `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     taskSecond:   `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textSecondary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
+    bulletColor:  c.bullet,
     warnIcon:     `width:16px;height:16px;background:${c.bgWarning};border:1px solid ${c.textDueUrgent};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
     blockIcon:    `width:16px;height:16px;background:${c.bgDanger};border:1px solid ${c.textDueOd};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 1: pct badge — dual-render handled inline, style kept for reference
@@ -931,7 +949,7 @@ function emailTask(h: HighlightItem, e: ES): string {
   // ISSUE 12: bullet as <div> with border-radius:50%
   return `<tr><td style="padding:3px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
   <td width="14" valign="top" style="padding-top:7px; padding-right:8px;">
-    <div style="width:6px; height:6px; border-radius:50%; -webkit-border-radius:50%; background-color:#378ADD; font-size:1px; line-height:1px;">&nbsp;</div>
+    <div style="width:6px; height:6px; border-radius:50%; -webkit-border-radius:50%; background-color:${e.bulletColor}; font-size:1px; line-height:1px;">&nbsp;</div>
   </td>
   <td style="${e.taskFont} vertical-align:top;">${clean}${dueHtml}${pctHtml}</td>
 </tr></table></td></tr>`;
@@ -974,7 +992,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
       <!--[if !mso]><!-->
       <td width="${barPct}%" height="8" bgcolor="${color}" style="background-color:${color}; font-size:1px; line-height:1px; border-radius:4px 0 0 4px; -webkit-border-radius:4px 0 0 4px;">&nbsp;</td>
       <!--<![endif]-->
-      ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="${c.bgPrimary}" style="background-color:${c.bgPrimary}; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
+      ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
     </tr></table>
   </td>
   <td width="50" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:${c.textSecondary}; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
@@ -1001,7 +1019,7 @@ function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
     const chunk = tiles.slice(i, i + 3);
     rows += `<tr>${chunk.map(t => {
       const numColor = t.warn ? c.textDueUrgent : c.textPrimary;
-      return `<td width="33%" align="center" bgcolor="${c.pageBg}" style="background-color:${c.pageBg}; padding:12px 8px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
+      return `<td width="33%" align="center" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; padding:14px 10px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:22px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${numColor}; font-family:Arial,Helvetica,sans-serif;">${t.value ?? 0}</div>
   <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textTertiary}; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif; margin-top:4px;">${t.label}</div>
 </td>`;
@@ -1038,7 +1056,7 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
     let smRows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="${c.pageBg}" style="background-color:${c.pageBg}; padding:10px 8px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
+      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; padding:14px 10px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:20px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif;">${m.value}</div>
   <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textSecondary}; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif;">${m.label}</div>
 </td>`).join("")}</tr>`;
@@ -1082,14 +1100,14 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
 
   // Person card with consistent 16px margin-bottom, proper border treatment
   return `<!--[if mso]>
-<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.headerAccentBorder}" width="100%" style="background-color:${c.bgPrimary}; margin-bottom:16px; border-collapse:separate;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.headerAccentBorder}" width="100%" style="background-color:${c.bgPrimary}; margin-bottom:18px; border-collapse:separate;">
 <tr><td style="padding:0; background-color:${c.bgPrimary};">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-  <tr><td style="padding:16px 20px; background-color:${c.headerAccent}; border-bottom:1px solid ${c.headerAccentBorder};">
+  <tr><td style="padding:18px 22px; background-color:${c.headerAccent}; border-bottom:2px solid ${c.headerAccentBorder};">
 <![endif]-->
 <!--[if !mso]><!-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgPrimary}; border:1px solid ${c.borderTertiary}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:16px;">
-<tr><td style="padding:16px 20px; background-color:${c.headerAccent}; border-bottom:1px solid ${c.headerAccentBorder}; border-radius:12px 12px 0 0; -webkit-border-radius:12px 12px 0 0; font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgPrimary}; border:1px solid ${c.borderTertiary}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:18px;">
+<tr><td style="padding:18px 22px; background-color:${c.headerAccent}; border-bottom:2px solid ${c.headerAccentBorder}; border-radius:12px 12px 0 0; -webkit-border-radius:12px 12px 0 0; font-family:Arial,Helvetica,sans-serif;">
 <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
         <td width="44" valign="top" style="padding-right:12px; width:44px; vertical-align:top;">
@@ -1101,14 +1119,14 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
           <!--<![endif]-->
         </td>
         <td style="vertical-align:middle; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
-          <div style="font-size:15px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif;">${p.name}</div>
-          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; margin-top:2px;">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
+          <div style="font-size:16px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif;">${p.name}</div>
+          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#cbd5e1; font-family:Arial,Helvetica,sans-serif; margin-top:3px;">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
         </td>
         <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:12px;">${tag}</td>
       </tr></table>
     </td>
   </tr>
-  ${hasBody ? `<tr><td style="padding:16px 20px; background-color:${c.bgPrimary}; font-family:Arial,Helvetica,sans-serif;">
+  ${hasBody ? `<tr><td style="padding:18px 22px; background-color:${c.bgPrimary}; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${pipelineHtml}${ontackHtml}${blockersHtml}${tomorrowHtml}${overflowHtml}
       ${emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c, e)}
@@ -1134,13 +1152,13 @@ function emailDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, 
   <tr>
     <td width="4" bgcolor="${c.headerAccentBorder}" style="background-color:${c.headerAccentBorder}; font-size:0; line-height:0;">&nbsp;</td>
     <!--[if mso]>
-    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:12px 16px; border:1px solid ${c.headerAccentBorder}; font-family:Arial,Helvetica,sans-serif;">
+    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:14px 18px; border:1px solid ${c.headerAccentBorder}; font-family:Arial,Helvetica,sans-serif;">
     <![endif]-->
     <!--[if !mso]><!-->
-    <td style="background-color:${c.headerAccent}; padding:12px 16px; border:1px solid ${c.headerAccentBorder}; border-left:none; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0; font-family:Arial,Helvetica,sans-serif;">
+    <td style="background-color:${c.headerAccent}; padding:14px 18px; border:1px solid ${c.headerAccentBorder}; border-left:none; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0; font-family:Arial,Helvetica,sans-serif;">
     <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-        <td style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
+        <td style="font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
         <td style="text-align:right; white-space:nowrap; padding-left:12px;">${statusPill}</td>
       </tr></table>
     </td>
@@ -1270,8 +1288,8 @@ function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES):
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
   <tr>
     <td width="4" bgcolor="${c.headerAccentBorder}" style="background-color:${c.headerAccentBorder}; font-size:0; line-height:0;">&nbsp;</td>
-    <td bgcolor="${c.bgPrimary}" style="background-color:${c.bgPrimary}; padding:16px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
-      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse ?? ""}</div>
+    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:16px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
+      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse ?? ""}</div>
     </td>
   </tr>
   </table>
@@ -1382,26 +1400,29 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   table { border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt; }
   td { padding:0; }
   img { border:0; display:block; }
+  @media screen {
+    .light-card { box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04); }
+  }
 </style>
 </head>
 <body style="margin:0; padding:0; background-color:${c.pageBodyBg};">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.pageBodyBg};">
-<tr><td align="center" style="padding:24px 16px;">
+<tr><td align="center" style="padding:32px 20px;">
 <!--[if mso]>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" align="center" style="table-layout:fixed; width:700px;">
 <tr><td style="width:700px; padding:0;">
 <![endif]-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:${c.pageBg};">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" class="${ctx.theme === "light" ? "light-card" : ""}" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:${c.pageBg}; border:1px solid ${c.borderTertiary};">
 
   <!-- ═══ HEADER — both clients see this ═══ -->
-  <tr><td style="background-color:${c.bgPrimary}; padding:20px 28px 16px; font-family:Arial,Helvetica,sans-serif;">
+  <tr><td style="background-color:${c.navy}; padding:24px 32px 20px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td valign="top" style="font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-size:17px; line-height:24px; mso-line-height-rule:exactly; font-weight:700; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif;">${orgName}</div>
-        <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textTertiary}; margin-top:3px; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif;">Executive Summary</div>
+        <div style="font-size:17px; line-height:24px; mso-line-height-rule:exactly; font-weight:700; color:#ffffff; font-family:Arial,Helvetica,sans-serif;">${orgName}</div>
+        <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.55); margin-top:3px; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif;">Executive Summary</div>
       </td>
       <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:16px;">
-        <div style="font-size:13px; line-height:18px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-weight:500; font-family:Arial,Helvetica,sans-serif;">${formattedDate}</div>
+        <div style="font-size:13px; line-height:18px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.75); font-weight:500; font-family:Arial,Helvetica,sans-serif;">${formattedDate}</div>
       </td>
     </tr></table>
   </td></tr>
