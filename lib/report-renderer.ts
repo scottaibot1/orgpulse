@@ -148,7 +148,7 @@ const C_DARK: Palette = {
   textProgress:      "#d1fae5",
   textProgressLabel: "#4ade80",
   textDue:           "#64748b",
-  textDueOd:         "#f87171",   // Brighter red for dark mode visibility
+  textDueOd:         "#ef4444",
   textDueUrgent:     "#f59e0b",
   radiusLg:          "12px",
   radiusMd:          "8px",
@@ -527,7 +527,7 @@ function buildE(c: Palette) {
     personName:   `font-size:15px;line-height:20px;mso-line-height-rule:exactly;font-weight:500;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;`,
     personMeta:   `font-size:12px;line-height:16px;mso-line-height-rule:exactly;color:${c.textTertiary};font-family:Arial,Helvetica,sans-serif;margin-top:2px;`,
     catLabel:     `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;font-family:Arial,Helvetica,sans-serif;display:block;margin:14px 0 5px;`,
-    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
+    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
     taskFont:     `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     taskSecond:   `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textSecondary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     bulletColor:  c.bullet,
@@ -536,7 +536,7 @@ function buildE(c: Palette) {
     // ISSUE 1: pct badge — dual-render handled inline, style kept for reference
     pct:          `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#334155;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;`,
     dueNormal:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDue};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
-    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueOd};margin-left:6px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;font-weight:600;`,
+    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueOd};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
     dueUrgent:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueUrgent};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 1: tags using dual-render pattern inline — style kept for reference
     tagFresh:     `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#14532d;color:#86efac;font-family:Arial,Helvetica,sans-serif;`,
@@ -878,10 +878,8 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 <style>${buildPdfCss(c)}</style>
 </head>
 <body>
+<button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;z-index:100;">Save as PDF</button>
 <div class="page">
-<div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-<button class="print-btn" onclick="window.print()" style="background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Save as PDF</button>
-</div>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:.5px solid ${c.borderTertiary}">
     <div>
       <div style="font-size:20px;font-weight:700;color:${c.textPrimary}">${orgName}</div>
@@ -920,16 +918,16 @@ function emailPill(text: string, bgSolid: string, _bgRgba: string, color: string
 }
 
 // ISSUE 1, 4E, 13: emailTask with bullet <div>, OVERDUE badge in separate <td>
-function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
+function emailTask(h: HighlightItem, e: ES): string {
   const { clean, dueDate, pct } = extractDuePct(h.text);
-  const icon = iconType(h, ctx.summaryDate);
+  const icon = iconType(h);
 
   let dueHtml = "";
   if (dueDate) {
-    const st = dueDateStatus(dueDate, ctx.summaryDate);
+    const st = dueDateStatus(dueDate);
     const style = st === "overdue" ? e.dueOd : st === "urgent" ? e.dueUrgent : e.dueNormal;
     const prefix = st === "overdue" ? "was due " : "due ";
-    dueHtml = ` <span style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
+    dueHtml = ` <span style="${style}">· ${prefix}${fmtMD(dueDate)}</span>`;
   }
   // ISSUE 1: pct badge with MSO dual-render
   const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, "#334155", "#94a3b8")}` : "";
@@ -1081,13 +1079,13 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
         ontackHtml += `<tr><td style="padding:6px 0 2px;"><div style="${e.subcat}">${h.subcategory}</div></td></tr>`;
         lastSub = h.subcategory;
       }
-      ontackHtml += emailTask(h, e, ctx);
+      ontackHtml += emailTask(h, e);
     }
   }
 
   let blockersHtml = "";
   if (blockers.length > 0) {
-    blockersHtml = `<tr><td style="padding:10px 0 4px;"><div style="${e.catLabel}">Blocked</div></td></tr>` + blockers.map(h => emailTask(h, e, ctx)).join("");
+    blockersHtml = `<tr><td style="padding:10px 0 4px;"><div style="${e.catLabel}">Blocked</div></td></tr>` + blockers.map(h => emailTask(h, e)).join("");
   }
 
   let tomorrowHtml = "";
@@ -1193,9 +1191,8 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
     rows += `<div style="${e.deptLabel} padding:8px 0 4px;">${dept}</div>`;
     for (const item of deptItems) {
       // ISSUE 1: dual-render badges for overdue/due soon
-      const displayDays = item.daysOverdue && item.daysOverdue > 90 ? "90d+" : (item.daysOverdue ? `${item.daysOverdue}d` : "");
       const badgeDual = item.status === "overdue"
-        ? emailStatusBadgeDual(`OVERDUE${displayDays ? ` ${displayDays}` : ""}`, "#7f1d1d", "#fca5a5")
+        ? emailStatusBadgeDual(`OVERDUE${item.daysOverdue ? ` ${item.daysOverdue}d` : ""}`, "#7f1d1d", "#fca5a5")
         : (item.status === "imminentlyDue" || item.status === "dueSoon")
         ? emailStatusBadgeDual("DUE SOON", "#78350f", "#fcd34d") : "";
       const icon = item.status === "blocked" ? "🚨" : "⚠️";
@@ -1276,7 +1273,6 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
 
 // ISSUE 2: MSO conditional scorecard pills in emailPulse
 function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES): string {
-  console.log(`[Email Pulse] todaysPulse value:`, JSON.stringify(data.todaysPulse));
   const cs = data.completenessScore;
   const fresh = cs?.freshToday ?? 0;
   const pct = cs?.percentage ?? 0;
@@ -1300,8 +1296,8 @@ function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES):
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
   <tr>
     <td width="4" bgcolor="${c.headerAccentBorder}" style="background-color:${c.headerAccentBorder}; font-size:0; line-height:0;">&nbsp;</td>
-    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:18px 20px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
-      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse || "No pulse summary available for this report."}</div>
+    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:16px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
+      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse ?? ""}</div>
     </td>
   </tr>
   </table>

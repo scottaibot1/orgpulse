@@ -47,14 +47,12 @@ export async function sendSummaryEmail({
   if (parsed) {
     try {
       html = renderEmailHtml(parsed, ctx);
-      console.log(`[Email] renderEmailHtml ok — html size: ${html.length} chars`);
     } catch (renderErr) {
       const msg = renderErr instanceof Error ? `${renderErr.message}\n${renderErr.stack}` : String(renderErr);
       console.error("[Email] renderEmailHtml threw:", msg);
       useLegacy = true;
     }
   }
-  if (useLegacy) console.log("[Email] using legacy fallback template");
   if (useLegacy) {
     // Fallback: send a clean notification email pointing to the PDF
     // (never fall back to marked.parse(markdown) since that renders raw JSON when AI returns structured data)
@@ -96,19 +94,15 @@ export async function sendSummaryEmail({
   }
 
   const subject = `${orgName} Executive Summary — ${summaryDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-  const text = `${orgName} Executive Summary\n\nYour executive summary for ${orgName} is ready.\n\nView the full report: ${pdfUrl}\n\n—\nSent by OrgRise AI`;
 
-  console.log(`[Email] sending to ${toEmail} — subject: "${subject}"`);
-  const { data: sendData, error } = await getResend().emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to: toEmail,
     subject,
     html,
-    text,
   });
 
   if (error) throw new Error(`Email send failed: ${error.message}`);
-  console.log(`[Email] Resend accepted — id: ${sendData?.id}`);
 }
 
 export async function sendInvitationEmail({
