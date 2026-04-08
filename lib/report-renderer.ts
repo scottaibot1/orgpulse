@@ -148,7 +148,7 @@ const C_DARK: Palette = {
   textProgress:      "#d1fae5",
   textProgressLabel: "#4ade80",
   textDue:           "#64748b",
-  textDueOd:         "#ef4444",
+  textDueOd:         "#f87171",   // Brighter red for dark mode visibility
   textDueUrgent:     "#f59e0b",
   radiusLg:          "12px",
   radiusMd:          "8px",
@@ -536,7 +536,7 @@ function buildE(c: Palette) {
     // ISSUE 1: pct badge — dual-render handled inline, style kept for reference
     pct:          `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#334155;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;`,
     dueNormal:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDue};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
-    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueOd};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
+    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueOd};margin-left:6px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;font-weight:600;`,
     dueUrgent:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueUrgent};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 1: tags using dual-render pattern inline — style kept for reference
     tagFresh:     `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#14532d;color:#86efac;font-family:Arial,Helvetica,sans-serif;`,
@@ -918,16 +918,16 @@ function emailPill(text: string, bgSolid: string, _bgRgba: string, color: string
 }
 
 // ISSUE 1, 4E, 13: emailTask with bullet <div>, OVERDUE badge in separate <td>
-function emailTask(h: HighlightItem, e: ES): string {
+function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
   const { clean, dueDate, pct } = extractDuePct(h.text);
-  const icon = iconType(h);
+  const icon = iconType(h, ctx.summaryDate);
 
   let dueHtml = "";
   if (dueDate) {
-    const st = dueDateStatus(dueDate);
+    const st = dueDateStatus(dueDate, ctx.summaryDate);
     const style = st === "overdue" ? e.dueOd : st === "urgent" ? e.dueUrgent : e.dueNormal;
     const prefix = st === "overdue" ? "was due " : "due ";
-    dueHtml = ` <span style="${style}">· ${prefix}${fmtMD(dueDate)}</span>`;
+    dueHtml = ` <span style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
   }
   // ISSUE 1: pct badge with MSO dual-render
   const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, "#334155", "#94a3b8")}` : "";
@@ -1079,13 +1079,13 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
         ontackHtml += `<tr><td style="padding:6px 0 2px;"><div style="${e.subcat}">${h.subcategory}</div></td></tr>`;
         lastSub = h.subcategory;
       }
-      ontackHtml += emailTask(h, e);
+      ontackHtml += emailTask(h, e, ctx);
     }
   }
 
   let blockersHtml = "";
   if (blockers.length > 0) {
-    blockersHtml = `<tr><td style="padding:10px 0 4px;"><div style="${e.catLabel}">Blocked</div></td></tr>` + blockers.map(h => emailTask(h, e)).join("");
+    blockersHtml = `<tr><td style="padding:10px 0 4px;"><div style="${e.catLabel}">Blocked</div></td></tr>` + blockers.map(h => emailTask(h, e, ctx)).join("");
   }
 
   let tomorrowHtml = "";
