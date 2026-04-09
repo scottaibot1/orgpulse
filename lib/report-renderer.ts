@@ -779,13 +779,29 @@ function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext):
     const icon = pdfAttnIcon(item);
     const dueStr = pdfDueStr(item, refDate);
     const pctStr = item.pctComplete != null ? ` · ${item.pctComplete}%` : "";
-    const metaParts = [dueStr ? dueStr.replace(/^ · /, "") : null, pctStr ? pctStr.replace(/^ · /, "") : null, item.who, item.department].filter(Boolean);
-    const meta = metaParts.join(" · ");
+    const isOverdue = item.status === "overdue";
+    const isUrgent = item.status === "imminentlyDue" || item.status === "dueSoon";
+
+    // Build the due-date span with color based on status
+    let dueDateSpan = "";
+    if (dueStr) {
+      const cleanDue = dueStr.replace(/^ · /, "");
+      const dueColor = isOverdue ? c.textDueOd : (isUrgent ? c.textDueUrgent : c.textTertiary);
+      dueDateSpan = `<span style="color:${dueColor}; font-weight:600;">${cleanDue}</span>`;
+    }
+
+    // Build the rest of the meta (pct, who, dept) in tertiary color
+    const restParts = [pctStr ? pctStr.replace(/^ · /, "") : null, item.who, item.department].filter(Boolean);
+    const restMeta = restParts.join(" · ");
+
+    // Combine
+    const metaHtml = [dueDateSpan, restMeta].filter(Boolean).join(` <span style="color:${c.textTertiary};">·</span> `);
+
     rows += `<div class="attn-row">
   <div class="attn-icon">${icon}</div>
   <div class="attn-body">
     <div class="attn-title">${badge}${item.text}</div>
-    ${meta ? `<div class="attn-meta">${meta}</div>` : ""}
+    ${metaHtml ? `<div class="attn-meta">${metaHtml}</div>` : ""}
   </div>
 </div>`;
   }
@@ -1199,7 +1215,10 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
       const dueStr = item.dueDate ? (() => {
         const iso = mdToISO(item.dueDate!);
         const fmt = fmtMD(iso);
-        return item.status === "overdue" ? ` · was due ${fmt}` : ` · due ${fmt}`;
+        const isOverdue = item.status === "overdue";
+        const prefix = isOverdue ? "was due" : "due";
+        const dateColor = isOverdue ? "#f87171" : (item.status === "imminentlyDue" || item.status === "dueSoon" ? "#fcd34d" : c.textTertiary);
+        return ` · <span style="color:${dateColor}; font-weight:600;">${prefix} ${fmt}</span>`;
       })() : "";
       rows += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:8px; border-bottom:1px solid ${c.borderTertiary};"><tr>
   <td width="22" valign="top" style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; padding:8px 6px 8px 0;">${icon}</td>
