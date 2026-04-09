@@ -787,7 +787,7 @@ function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext):
     if (dueStr) {
       const cleanDue = dueStr.replace(/^ · /, "");
       const dueColor = isOverdue ? c.textDueOd : (isUrgent ? c.textDueUrgent : c.textTertiary);
-      dueDateSpan = `<span style="color:${dueColor}; font-weight:600;">${cleanDue}</span>`;
+      dueDateSpan = `<span style="color:${dueColor}; font-weight:700;">${cleanDue}</span>`;
     }
 
     // Build the rest of the meta (pct, who, dept) in tertiary color
@@ -942,8 +942,9 @@ function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
   if (dueDate) {
     const st = dueDateStatus(dueDate, ctx.summaryDate);
     const style = st === "overdue" ? e.dueOd : st === "urgent" ? e.dueUrgent : e.dueNormal;
+    const className = st === "overdue" ? "due-overdue" : st === "urgent" ? "due-urgent" : "due-normal";
     const prefix = st === "overdue" ? "was due " : "due ";
-    dueHtml = ` <span style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
+    dueHtml = ` <span class="${className}" style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
   }
   // ISSUE 1: pct badge with MSO dual-render
   const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, "#334155", "#94a3b8")}` : "";
@@ -1216,9 +1217,11 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
         const iso = mdToISO(item.dueDate!);
         const fmt = fmtMD(iso);
         const isOverdue = item.status === "overdue";
+        const isUrgent = item.status === "imminentlyDue" || item.status === "dueSoon";
         const prefix = isOverdue ? "was due" : "due";
-        const dateColor = isOverdue ? "#f87171" : (item.status === "imminentlyDue" || item.status === "dueSoon" ? "#fcd34d" : c.textTertiary);
-        return ` · <span style="color:${dateColor}; font-weight:600;">${prefix} ${fmt}</span>`;
+        const dateColor = isOverdue ? "#f87171" : (isUrgent ? "#fcd34d" : c.textTertiary);
+        const className = isOverdue ? "due-overdue" : isUrgent ? "due-urgent" : "due-normal";
+        return ` · <span class="${className}" style="color:${dateColor}; font-weight:700;">${prefix} ${fmt}</span>`;
       })() : "";
       rows += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:8px; border-bottom:1px solid ${c.borderTertiary};"><tr>
   <td width="22" valign="top" style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; padding:8px 6px 8px 0;">${icon}</td>
@@ -1415,6 +1418,8 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no"/>
+<meta name="x-apple-disable-message-reformatting"/>
 <title>Executive Summary — ${orgName}</title>
 <!--[if mso]>
 <style type="text/css">
@@ -1427,6 +1432,30 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   table { border-spacing:0; mso-table-lspace:0pt; mso-table-rspace:0pt; }
   td { padding:0; }
   img { border:0; display:block; }
+  /* Override iOS Mail data detector — stop auto-linking dates, phones, addresses */
+  a[x-apple-data-detectors] {
+    color: inherit !important;
+    text-decoration: none !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+    font-weight: inherit !important;
+    line-height: inherit !important;
+  }
+  /* Force due date spans to override any auto-detection */
+  .due-overdue {
+    color: #f87171 !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+  }
+  .due-urgent {
+    color: #fcd34d !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+  }
+  .due-normal {
+    color: #94a3b8 !important;
+    text-decoration: none !important;
+  }
   @media screen {
     .light-card { box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04); }
   }
