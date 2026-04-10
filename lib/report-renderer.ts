@@ -1,5 +1,6 @@
 // lib/report-renderer.ts
 // Default: dark mode. Pass ctx.theme = 'light' for light mode.
+import { getTokens, DesignTokens } from "./design-tokens";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -106,118 +107,13 @@ export interface RenderContext {
 
 // ── Palettes ───────────────────────────────────────────────────────────────────
 
-interface Palette {
-  pageBodyBg: string; pageBg: string; navy: string;
-  bgPrimary: string; bgSecondary: string; bgPct: string;
-  bgSuccess: string; bgWarning: string; bgDanger: string; bgProgress: string;
-  borderTertiary: string; borderSuccess: string; borderProgress: string;
-  textPrimary: string; textSecondary: string; textTertiary: string;
-  textInfo: string; textSuccess: string; textWarning: string; textDanger: string;
-  textProgress: string; textProgressLabel: string;
-  textDue: string; textDueOd: string; textDueUrgent: string;
-  radiusLg: string; radiusMd: string;
-  bullet: string; bar1: string; bar2: string; bar3: string; bar4: string; bar5: string;
-  headerAccent: string;       // Person card header background
-  headerAccentBorder: string; // Person card header border
-  headerAccentText: string;   // Text color on header accent
-  buttonBg: string;           // CTA button background
-  buttonText: string;         // CTA button text
+function pal(ctx: RenderContext): DesignTokens {
+  return getTokens(ctx.theme ?? "dark");
 }
 
-const C_DARK: Palette = {
-  pageBodyBg:        "#0f172a",
-  pageBg:            "#0f172a",
-  navy:              "#1e293b",
-  bgPrimary:         "#1e293b",
-  bgSecondary:       "#0f172a",
-  bgPct:             "#334155",
-  bgSuccess:         "#14532d",
-  bgWarning:         "#78350f",
-  bgDanger:          "#7f1d1d",
-  bgProgress:        "#0d2818",
-  borderTertiary:    "rgba(255,255,255,0.08)",
-  borderSuccess:     "#166534",
-  borderProgress:    "#166534",
-  textPrimary:       "#f1f5f9",
-  textSecondary:     "#94a3b8",
-  textTertiary:      "#64748b",
-  textInfo:          "#818cf8",
-  textSuccess:       "#86efac",
-  textWarning:       "#fcd34d",
-  textDanger:        "#fca5a5",
-  textProgress:      "#d1fae5",
-  textProgressLabel: "#4ade80",
-  textDue:           "#64748b",
-  textDueOd:         "#f87171",   // Brighter red for dark mode visibility
-  textDueUrgent:     "#f59e0b",
-  radiusLg:          "12px",
-  radiusMd:          "8px",
-  bullet: "#378ADD", bar1: "#378ADD", bar2: "#1D9E75", bar3: "#EF9F27", bar4: "#7F77DD", bar5: "#888780",
-  headerAccent:       "#172554",
-  headerAccentBorder: "#3b82f6",
-  headerAccentText:   "#93c5fd",
-  buttonBg:           "#4f46e5",
-  buttonText:         "#ffffff",
-};
-
-const C_LIGHT: Palette = {
-  // PAGE BACKGROUND — visibly tinted, NOT white
-  pageBodyBg:        "#eef2f7",   // Cool blue-gray — provides clear contrast against white cards
-  pageBg:            "#ffffff",   // White email card container
-  navy:              "#1e293b",   // Dark navy header bar (top of email)
-  bgPrimary:         "#ffffff",   // Pure white person card body
-  bgSecondary:       "#f1f5f9",   // Tinted gray for nested sections, time bar tracks, pipeline tiles
-  bgPct:             "#e0e7ff",   // Indigo-tinted percentage badges
-
-  // Status backgrounds — saturated, not pastel
-  bgSuccess:         "#d1fae5",
-  bgWarning:         "#fef3c7",
-  bgDanger:          "#fee2e2",
-  bgProgress:        "#ecfdf5",   // Faint mint for notable progress
-
-  // Borders — visible, not ghosts
-  borderTertiary:    "#cbd5e1",
-  borderSuccess:     "#86efac",
-  borderProgress:    "#86efac",
-
-  // Text — near-black for primary, real grays for secondary
-  textPrimary:       "#0f172a",
-  textSecondary:     "#334155",
-  textTertiary:      "#64748b",
-  textInfo:          "#4338ca",   // DEEP indigo
-  textSuccess:       "#15803d",
-  textWarning:       "#b45309",   // Burnt amber
-  textDanger:        "#b91c1c",   // Rich red
-  textProgress:      "#14532d",
-  textProgressLabel: "#15803d",
-  textDue:           "#64748b",
-  textDueOd:         "#b91c1c",
-  textDueUrgent:     "#b45309",
-
-  radiusLg:          "12px",
-  radiusMd:          "8px",
-
-  // Bullet and bar colors — deeper, more saturated
-  bullet:            "#4338ca",
-  bar1:              "#4338ca",
-  bar2:              "#059669",
-  bar3:              "#d97706",
-  bar4:              "#7c3aed",
-  bar5:              "#475569",
-
-  // HEADER ACCENTS — dark navy headers on white cards
-  headerAccent:       "#1e293b",   // Dark slate header background
-  headerAccentBorder: "#4338ca",   // Deep indigo accent border
-  headerAccentText:   "#f1f5f9",   // Near-white text on dark header
-  buttonBg:           "#4338ca",
-  buttonText:         "#ffffff",
-};
-
-function pal(ctx: RenderContext): Palette {
-  return (ctx.theme ?? "dark") === "light" ? C_LIGHT : C_DARK;
+function getBarColors(c: DesignTokens): string[] {
+  return [c.bar1, c.bar2, c.bar3, c.bar4, c.bar5, c.bar6];
 }
-
-const BAR_COLORS = ["#378ADD", "#1D9E75", "#EF9F27", "#7F77DD", "#888780", "#ec4899"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -393,21 +289,21 @@ function groupAttention(items: NeedsAttentionItem[]): Map<string, NeedsAttention
 
 // ── PDF CSS (theme-aware) ──────────────────────────────────────────────────────
 
-function buildPdfCss(c: Palette): string {
+function buildPdfCss(c: DesignTokens): string {
   return `
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --color-background-primary:${c.bgPrimary};
-  --color-background-secondary:${c.bgSecondary};
+  --color-background-primary:${c.sectionBg};
+  --color-background-secondary:${c.sectionBgAlt};
   --color-background-success:${c.bgSuccess};
   --color-background-warning:${c.bgWarning};
   --color-background-danger:${c.bgDanger};
-  --color-border-tertiary:${c.borderTertiary};
+  --color-border-tertiary:${c.border};
   --color-border-success:${c.borderSuccess};
   --color-text-primary:${c.textPrimary};
   --color-text-secondary:${c.textSecondary};
   --color-text-tertiary:${c.textTertiary};
-  --color-text-info:${c.textInfo};
+  --color-text-info:${c.accentPrimary};
   --color-text-success:${c.textSuccess};
   --color-text-warning:${c.textWarning};
   --color-text-danger:${c.textDanger};
@@ -418,18 +314,18 @@ function buildPdfCss(c: Palette): string {
 body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrimary};}
 .page{max-width:880px;margin:0 auto;background:${c.pageBg};padding:2rem 2.5rem 3rem;}
 .r{padding:1.5rem 0;max-width:880px;font-family:var(--font-sans)}
-.pulse{background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:var(--border-radius-lg);padding:1.5rem;margin-bottom:1.5rem}
+.pulse{background:${c.headerBg};border:.5px solid ${c.border};border-radius:var(--border-radius-lg);padding:1.5rem;margin-bottom:1.5rem}
 .pulse-label{font-size:11px;font-weight:500;color:#f59e0b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.625rem}
-.pulse-inner{background:${c.bgSecondary};border-left:4px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:1rem}
-.pulse-headline{font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6}
+.pulse-inner{background:${c.sectionBgAlt};border-left:4px solid ${c.accentPrimaryBorder};border-radius:8px;padding:16px;margin-bottom:1rem}
+.pulse-headline{font-size:16px;font-weight:500;color:${c.textPrimary};line-height:1.6}
 .pulse-pills{display:flex;flex-wrap:wrap;gap:8px}
 .pill{font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500}
-.pill-ok{background:#14532d;color:#86efac}
-.pill-warn{background:#78350f;color:#fcd34d}
-.pill-neutral{background:${c.bgSecondary};color:${c.textSecondary};border:.5px solid ${c.borderTertiary}}
+.pill-ok{background:${c.bgSuccess};color:${c.textSuccess}}
+.pill-warn{background:${c.bgWarning};color:${c.textUrgent}}
+.pill-neutral{background:${c.sectionBgAlt};color:${c.textSecondary};border:.5px solid ${c.border}}
 .sec-label{font-size:11px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;margin:1.5rem 0 .75rem}
 .card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem}
-.attn-card{background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};padding:4px 16px;margin-bottom:1.25rem}
+.attn-card{background:${c.headerBg};border:.5px solid ${c.border};border-radius:${c.radiusLg};padding:4px 16px;margin-bottom:1.25rem}
 .dept-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:.75rem 0 .35rem}
 .dept-label:first-child{margin-top:0}
 .attn-row{display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:.5px solid rgba(255,255,255,0.06)}
@@ -439,26 +335,26 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 .attn-title{font-size:13px;font-weight:500;color:${c.textPrimary};line-height:1.5;margin-bottom:3px}
 .attn-meta{font-size:11px;color:${c.textTertiary}}
 .waiting-section{padding:8px 0 4px}
-.waiting-label{font-size:10px;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.waiting-label{font-size:10px;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .waiting-item{font-size:12px;color:${c.textTertiary};padding:2px 0}
-.waiting-name{color:${c.textInfo}}
-.notable-card{background:${c.bgProgress};border:.5px solid ${c.borderProgress};border-radius:${c.radiusLg};padding:1rem 1.25rem;margin-bottom:.75rem}
-.notable-label{font-size:11px;font-weight:500;color:${c.textProgressLabel};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem}
-.notable-dept{font-size:10px;font-weight:500;color:${c.textProgressLabel};text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .3rem;border-bottom:.5px solid ${c.borderProgress};padding-bottom:4px}
+.waiting-name{color:${c.accentPrimary}}
+.notable-card{background:${c.bgSuccess};border:.5px solid ${c.borderSuccess};border-radius:${c.radiusLg};padding:1rem 1.25rem;margin-bottom:.75rem}
+.notable-label{font-size:11px;font-weight:500;color:${c.textSuccess};text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem}
+.notable-dept{font-size:10px;font-weight:500;color:${c.textSuccess};text-transform:uppercase;letter-spacing:.06em;margin:.75rem 0 .3rem;border-bottom:.5px solid ${c.borderSuccess};padding-bottom:4px}
 .notable-dept:first-of-type{margin-top:0}
-.notable-item{display:flex;gap:8px;font-size:13px;color:${c.textProgress};line-height:1.5;padding:2px 0}
-.check{color:${c.textProgressLabel};flex-shrink:0}
+.notable-item{display:flex;gap:8px;font-size:13px;color:${c.textSuccess};line-height:1.5;padding:2px 0}
+.check{color:${c.textSuccess};flex-shrink:0}
 .notable-more{font-size:12px;color:${c.textSecondary};font-style:italic;margin-top:8px}
 .overdue-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 8px;border-radius:4px;margin-right:8px}
 .urgent-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-warning);color:var(--color-text-warning);padding:2px 8px;border-radius:4px;margin-right:8px}
 .blocked-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 8px;border-radius:4px;margin-right:8px}
-.person-card{background:${c.bgPrimary};border:.5px solid ${c.borderTertiary};border-radius:${c.radiusLg};margin-bottom:12px}
+.person-card{background:${c.sectionBg};border:.5px solid ${c.border};border-radius:${c.radiusLg};margin-bottom:12px}
 .person-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:.5px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:8px}
 .person-left{display:flex;align-items:center;gap:12px}
 .avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;flex-shrink:0}
 .person-name{font-size:15px;font-weight:500;color:${c.textPrimary}}
 .person-sub{font-size:12px;color:${c.textTertiary};margin-top:2px}
-.view-link{color:${c.textInfo};font-size:12px;text-decoration:none;margin-left:8px}
+.view-link{color:${c.accentPrimary};font-size:12px;text-decoration:none;margin-left:8px}
 .tag-fresh{background:${c.bgSuccess};color:${c.textSuccess};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
 .tag-standin{background:${c.bgWarning};color:${c.textWarning};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
 .tag-missing{background:${c.bgDanger};color:${c.textDanger};font-size:11px;font-weight:500;border-radius:20px;padding:3px 10px;white-space:nowrap}
@@ -466,35 +362,35 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 .cat-label{font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;margin:14px 0 5px}
 .cat-label:first-child{margin-top:0}
 .task{display:flex;gap:8px;align-items:flex-start;padding:4px 0}
-.task-text{font-size:13px;color:#e2e8f0;line-height:1.5;flex:1}
-.warn-icon{width:16px;height:16px;border-radius:4px;background:${c.bgWarning};border:1px solid #f59e0b;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
-.block-icon{width:16px;height:16px;border-radius:4px;background:${c.bgDanger};border:1px solid #ef4444;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
-.bullet{width:6px;height:6px;border-radius:50%;background:${c.bullet};flex-shrink:0;margin-top:6px}
+.task-text{font-size:13px;color:${c.textPrimary};line-height:1.5;flex:1}
+.warn-icon{width:16px;height:16px;border-radius:4px;background:${c.bgWarning};border:1px solid ${c.textUrgent};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.block-icon{width:16px;height:16px;border-radius:4px;background:${c.bgDanger};border:1px solid ${c.textOverdue};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.bullet{width:6px;height:6px;border-radius:50%;background:${c.accentPrimary};flex-shrink:0;margin-top:6px}
 .timebars{margin-top:16px;padding-top:14px;border-top:.5px solid rgba(255,255,255,0.06)}
 .timebars-header{display:flex;justify-content:space-between;margin-bottom:10px}
 .timebars-title{font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em}
 .timebars-total{font-size:12px;color:${c.textTertiary}}
-.timebars-note{font-size:11px;color:#475569;font-style:italic;margin-bottom:8px}
+.timebars-note{font-size:11px;color:${c.textTertiary};font-style:italic;margin-bottom:8px}
 .tbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .tbar-label{font-size:12px;color:${c.textTertiary};width:130px;flex-shrink:0;line-height:1.3}
-.tbar-track{flex:1;height:4px;background:${c.bgSecondary};border-radius:2px;overflow:hidden}
+.tbar-track{flex:1;height:4px;background:${c.sectionBgAlt};border-radius:2px;overflow:hidden}
 .tbar-fill{height:4px;border-radius:2px}
 .tbar-h{font-size:12px;color:${c.textTertiary};white-space:nowrap}
-.subcat{font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin:8px 0 3px}
-.pct{background:${c.bgPct};color:${c.textSecondary};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:6px;display:inline-block;white-space:nowrap}
-.due{font-size:11px;color:${c.textDue};margin-left:6px;white-space:nowrap}
-.due.od{color:${c.textDueOd};font-weight:500}
-.due.urgent{color:${c.textDueUrgent};font-weight:500}
+.subcat{font-size:10px;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.05em;margin:8px 0 3px}
+.pct{background:${c.sectionBgAlt};color:${c.textSecondary};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:6px;display:inline-block;white-space:nowrap}
+.due{font-size:11px;color:${c.textTertiary};margin-left:6px;white-space:nowrap}
+.due.od{color:${c.textOverdue};font-weight:500}
+.due.urgent{color:${c.textUrgent};font-weight:500}
 .tmrow-item{display:flex;gap:8px;font-size:13px;color:${c.textSecondary};padding:3px 0;line-height:1.5}
-.dept-header-bar{display:flex;align-items:center;justify-content:space-between;background:${c.navy};border:.5px solid ${c.borderTertiary};border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:1rem 0 .5rem}
+.dept-header-bar{display:flex;align-items:center;justify-content:space-between;background:${c.headerBg};border:.5px solid ${c.border};border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:1rem 0 .5rem}
 .dept-header-bar-name{font-size:13px;font-weight:500;color:${c.textPrimary}}
 .dept-header-bar-status{font-size:11px;color:${c.textSuccess};background:${c.bgSuccess};padding:2px 10px;border-radius:20px}
 .pipeline-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
-.ptile{background:${c.bgSecondary};border-radius:${c.radiusMd};padding:.6rem;text-align:center;border:.5px solid ${c.borderTertiary}}
+.ptile{background:${c.sectionBgAlt};border-radius:${c.radiusMd};padding:.6rem;text-align:center;border:.5px solid ${c.border}}
 .ptile-num{font-size:20px;font-weight:500;color:${c.textPrimary}}
 .ptile-label{font-size:11px;color:${c.textSecondary};margin-top:2px}
 .not-expected-bar{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:.5rem 0;font-size:13px;color:var(--color-text-secondary)}
-.placeholder{font-size:13px;color:#475569;padding:6px 0}
+.placeholder{font-size:13px;color:${c.textTertiary};padding:6px 0}
 @media print{@page{margin:10mm 8mm;size:A4;}body{background:${c.pageBodyBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;}.print-btn{display:none!important;}}
 `.trim();
 }
@@ -510,50 +406,50 @@ function emailStatusBadgeDual(text: string, bg: string, fg: string): string {
   return `<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="background-color:${bg}; color:${fg}; font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; font-family:Arial,Helvetica,sans-serif; white-space:nowrap;">${text}</td></tr></table><![endif]--><!--[if !mso]><!--><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table;"><tr><td style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; padding:3px 10px; border-radius:10px; -webkit-border-radius:10px; white-space:nowrap; background-color:${bg}; color:${fg}; font-family:Arial,Helvetica,sans-serif;">${text}</td></tr></table><!--<![endif]-->`;
 }
 
-function buildE(c: Palette) {
+function buildE(c: DesignTokens) {
   return {
     // ISSUE 1 & 2: scorecard pills — colors only, MSO conditionals handled in emailPulse
-    pillOkBg:     `#14532d`,
+    pillOkBg:     `${c.bgSuccess}`,
     pillOkBgRgba: `rgba(20,83,45,0.8)`,
-    pillOkColor:  `#86efac`,
-    pillNeutralBg:     `#1e293b`,
+    pillOkColor:  `${c.textSuccess}`,
+    pillNeutralBg:     `${c.sectionBg}`,
     pillNeutralBgRgba: `rgba(30,41,59,0.7)`,
-    pillNeutralColor:  `#94a3b8`,
-    pillWarnBg:   `#78350f`,
-    pillWarnColor:`#fcd34d`,
-    card:         `background:${c.bgPrimary};border:1px solid ${c.borderTertiary};padding:16px 20px;margin-bottom:12px;`,
+    pillNeutralColor:  `${c.textTertiary}`,
+    pillWarnBg:   `${c.bgWarning}`,
+    pillWarnColor:`${c.textUrgent}`,
+    card:         `background:${c.sectionBg};border:1px solid ${c.border};padding:16px 20px;margin-bottom:12px;`,
     deptLabel:    `font-size:10px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;`,
     secLabel:     `font-size:11px;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.08em;font-family:Arial,Helvetica,sans-serif;mso-line-height-rule:exactly;display:block;margin-bottom:10px;`,
     personName:   `font-size:15px;line-height:20px;mso-line-height-rule:exactly;font-weight:500;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;`,
     personMeta:   `font-size:12px;line-height:16px;mso-line-height-rule:exactly;color:${c.textTertiary};font-family:Arial,Helvetica,sans-serif;margin-top:2px;`,
     catLabel:     `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textTertiary};text-transform:uppercase;letter-spacing:.06em;font-family:Arial,Helvetica,sans-serif;display:block;margin:14px 0 5px;`,
-    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:#475569;text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
+    subcat:       `font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.05em;font-family:Arial,Helvetica,sans-serif;display:block;margin:8px 0 3px;`,
     taskFont:     `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
     taskSecond:   `font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:${c.textSecondary};font-family:Arial,Helvetica,sans-serif;word-break:normal;word-wrap:break-word;mso-line-break-override:none;`,
-    bulletColor:  c.bullet,
-    warnIcon:     `width:16px;height:16px;background:${c.bgWarning};border:1px solid ${c.textDueUrgent};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
-    blockIcon:    `width:16px;height:16px;background:${c.bgDanger};border:1px solid ${c.textDueOd};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
+    bulletColor:  c.accentPrimary,
+    warnIcon:     `width:16px;height:16px;background:${c.bgWarning};border:1px solid ${c.textUrgent};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
+    blockIcon:    `width:16px;height:16px;background:${c.bgDanger};border:1px solid ${c.textOverdue};text-align:center;font-size:10px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 1: pct badge — dual-render handled inline, style kept for reference
-    pct:          `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#334155;color:#94a3b8;font-family:Arial,Helvetica,sans-serif;`,
-    dueNormal:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDue};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
-    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueOd};margin-left:6px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;font-weight:600;`,
-    dueUrgent:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textDueUrgent};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
+    pct:          `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:${c.sectionBg};color:${c.textTertiary};font-family:Arial,Helvetica,sans-serif;`,
+    dueNormal:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textTertiary};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
+    dueOd:        `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textOverdue};margin-left:6px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;font-weight:600;`,
+    dueUrgent:    `font-size:11px;line-height:16px;mso-line-height-rule:exactly;color:${c.textUrgent};margin-left:4px;white-space:nowrap;font-family:Arial,Helvetica,sans-serif;`,
     // ISSUE 1: tags using dual-render pattern inline — style kept for reference
-    tagFresh:     `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#14532d;color:#86efac;font-family:Arial,Helvetica,sans-serif;`,
-    tagStandin:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#78350f;color:#fcd34d;font-family:Arial,Helvetica,sans-serif;`,
-    tagMissing:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:#7f1d1d;color:#fca5a5;font-family:Arial,Helvetica,sans-serif;`,
-    viewLink:     `font-size:12px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;color:#818cf8;text-decoration:none;`,
+    tagFresh:     `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:${c.bgSuccess};color:${c.textSuccess};font-family:Arial,Helvetica,sans-serif;`,
+    tagStandin:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:${c.bgWarning};color:${c.textUrgent};font-family:Arial,Helvetica,sans-serif;`,
+    tagMissing:   `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 10px;border-radius:20px;-webkit-border-radius:20px;white-space:nowrap;background:${c.bgDanger};color:${c.textDanger};font-family:Arial,Helvetica,sans-serif;`,
+    viewLink:     `font-size:12px;line-height:16px;mso-line-height-rule:exactly;font-family:Arial,Helvetica,sans-serif;color:${c.accentPrimary};text-decoration:none;`,
     // ISSUE 1: overdue/urgent badges — dual-render handled inline
-    overdueBadge: `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#7f1d1d;color:#fca5a5;font-family:Arial,Helvetica,sans-serif;`,
-    urgentBadge:  `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:#78350f;color:#fcd34d;font-family:Arial,Helvetica,sans-serif;`,
-    deptHeaderBar:`background:${c.pageBg};border:1px solid ${c.borderTertiary};padding:10px 16px;`,
+    overdueBadge: `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:${c.bgDanger};color:${c.textDanger};font-family:Arial,Helvetica,sans-serif;`,
+    urgentBadge:  `display:inline-block;font-size:10px;line-height:14px;mso-line-height-rule:exactly;font-weight:500;padding:3px 8px;border-radius:10px;-webkit-border-radius:10px;white-space:nowrap;background:${c.bgWarning};color:${c.textUrgent};font-family:Arial,Helvetica,sans-serif;`,
+    deptHeaderBar:`background:${c.pageBg};border:1px solid ${c.border};padding:10px 16px;`,
     deptBarName:  `font-size:13px;line-height:20px;mso-line-height-rule:exactly;font-weight:500;color:${c.textPrimary};font-family:Arial,Helvetica,sans-serif;`,
     // Section spacing and card styles
     sectionGap: `padding-top:24px;`,
-    cardBorder: `border:1px solid ${c.borderTertiary};`,
-    personHeaderBg: `background-color:${c.headerAccent};`,
-    personHeaderBorder: `border:1px solid ${c.headerAccentBorder};`,
-    deptBarAccent: `background-color:${c.headerAccentBorder};`,
+    cardBorder: `border:1px solid ${c.border};`,
+    personHeaderBg: `background-color:${c.accentPrimaryBg};`,
+    personHeaderBorder: `border:1px solid ${c.accentPrimaryBorder};`,
+    deptBarAccent: `background-color:${c.accentPrimaryBorder};`,
   };
 }
 type ES = ReturnType<typeof buildE>;
@@ -608,14 +504,15 @@ function pdfTomorrowItem(h: HighlightItem): string {
   return `<div class="tmrow-item"><span>📅</span>${clean}</div>`;
 }
 
-function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined): string {
+function pdfTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined, c: DesignTokens): string {
   if (!alloc || alloc.length === 0) return "";
   const totalH = alloc.reduce((s, t) => s + (t.hours ?? 0), 0);
   const totalStr = estimated ? `~${Number.isInteger(totalH) ? totalH : totalH.toFixed(0)}h est.` : `${hoursWorked != null ? hoursWorked : (Number.isInteger(totalH) ? totalH : totalH.toFixed(1))}h total`;
   const titleLabel = estimated ? `Time Allocation · Estimated` : `Time Allocation`;
+  const barColors = getBarColors(c);
   const rows = alloc.map((t, i) => {
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
-    const color = BAR_COLORS[i % BAR_COLORS.length];
+    const color = barColors[i % barColors.length];
     const hrs = estimated ? `~${t.hours}h` : `${t.hours}h`;
     return `<div class="tbar"><div class="tbar-label">${t.label}</div><div class="tbar-track"><div class="tbar-fill" style="width:${barPct}%;background:${color}"></div></div><span class="tbar-h">${hrs}</span></div>`;
   }).join("");
@@ -673,7 +570,7 @@ function avatarStyle(name: string, idx: number): { bg: string; color: string } {
   return AVATAR_COLORS[idx % AVATAR_COLORS.length];
 }
 
-function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx: number = 0): string {
+function pdfPersonCard(p: PersonData, ctx: RenderContext, c: DesignTokens, personIdx: number = 0): string {
   const href = reportHref(p.name, ctx);
   const viewLinkHtml = href ? `<a class="view-link" href="${href}">View Submitted Report →</a>` : "";
   const hoursStr = p.hoursWorked != null ? `${p.hoursWorked}h logged` : "Hours not logged";
@@ -731,9 +628,9 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx:
   }
 
   const overflowHtml = p.overflowNote
-    ? `<div style="font-size:12px;color:#475569;font-style:italic;margin-top:8px">${p.overflowNote}</div>` : "";
+    ? `<div style="font-size:12px;color:${c.textSecondary};font-style:italic;margin-top:8px">${p.overflowNote}</div>` : "";
 
-  const timeBarsHtml = pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked);
+  const timeBarsHtml = pdfTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c);
 
   const metaViewLink = viewLinkHtml ? ` · ${viewLinkHtml}` : "";
 
@@ -755,7 +652,7 @@ function pdfPersonCard(p: PersonData, ctx: RenderContext, c: Palette, personIdx:
 </div>`;
 }
 
-function pdfDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, startIdx: number = 0): string {
+function pdfDeptSection(dept: DepartmentData, ctx: RenderContext, c: DesignTokens, startIdx: number = 0): string {
   if (dept.notExpectedToday) return "";
   return `<div class="dept-header-bar">
   <span class="dept-header-bar-name">${dept.emoji} ${dept.name}</span>
@@ -764,7 +661,7 @@ function pdfDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, st
 ${(dept.people ?? []).map((p, i) => pdfPersonCard(p, ctx, c, startIdx + i)).join("")}`;
 }
 
-function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext): string {
+function pdfNeedsAttention(data: AiSummaryData, c: DesignTokens, ctx: RenderContext): string {
   const refDate = ctx.summaryDate;
   const items = (data.needsAttentionNow ?? []).slice().sort((a, b) => (b.daysOverdue ?? 0) - (a.daysOverdue ?? 0));
   const waiting = data.waitingOnExternal ?? [];
@@ -786,7 +683,7 @@ function pdfNeedsAttention(data: AiSummaryData, c: Palette, ctx: RenderContext):
     let dueDateSpan = "";
     if (dueStr) {
       const cleanDue = dueStr.replace(/^ · /, "");
-      const dueColor = isOverdue ? c.textDueOd : (isUrgent ? c.textDueUrgent : c.textTertiary);
+      const dueColor = isOverdue ? c.textOverdue : (isUrgent ? c.textUrgent : c.textTertiary);
       dueDateSpan = `<span style="color:${dueColor}; font-weight:700;">${cleanDue}</span>`;
     }
 
@@ -894,9 +791,9 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 <style>${buildPdfCss(c)}</style>
 </head>
 <body>
-<button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:#4f46e5;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;z-index:100;">Save as PDF</button>
+<button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:${c.buttonBg};color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;z-index:100;">Save as PDF</button>
 <div class="page">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:.5px solid ${c.borderTertiary}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:.5px solid ${c.border}">
     <div>
       <div style="font-size:20px;font-weight:700;color:${c.textPrimary}">${orgName}</div>
       <div style="font-size:11px;color:${c.textTertiary};margin-top:3px;text-transform:uppercase;letter-spacing:.1em">Executive Summary</div>
@@ -913,7 +810,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
     ${deptSections}
     ${notExpectedBar}
     <div style="text-align:center;padding:24px 0 8px;border-top:0.5px solid rgba(255,255,255,0.06);margin-top:24px;">
-      <span style="font-size:11px;color:#475569;">${orgName} · Confidential · Generated by OrgRise AI</span>
+      <span style="font-size:11px;color:${c.textTertiary};">${orgName} · Confidential · Generated by OrgRise AI</span>
     </div>
   </div>
 </div>
@@ -935,6 +832,7 @@ function emailPill(text: string, bgSolid: string, _bgRgba: string, color: string
 
 // ISSUE 1, 4E, 13: emailTask with bullet <div>, OVERDUE badge in separate <td>
 function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
+  const c = pal(ctx);
   const { clean, dueDate, pct } = extractDuePct(h.text);
   const icon = iconType(h, ctx.summaryDate);
 
@@ -947,14 +845,14 @@ function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
     dueHtml = ` <span class="${className}" style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
   }
   // ISSUE 1: pct badge with MSO dual-render
-  const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, "#334155", "#94a3b8")}` : "";
+  const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, c.sectionBg, c.textTertiary)}` : "";
 
   if (icon === "warn" || icon === "block") {
     // ISSUE 1 & 4E: badge in separate <td>, using dual-render badge
     const badgeLabel = icon === "warn" ? "URGENT" : "BLOCKED";
     const badgeDual = icon === "warn"
-      ? emailStatusBadgeDual(badgeLabel, "#78350f", "#fcd34d")
-      : emailStatusBadgeDual(badgeLabel, "#7f1d1d", "#fca5a5");
+      ? emailStatusBadgeDual(badgeLabel, c.bgWarning, c.textUrgent)
+      : emailStatusBadgeDual(badgeLabel, c.bgDanger, c.textDanger);
     return `<tr><td style="padding:3px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
   <td style="padding-right:8px; vertical-align:top; white-space:nowrap;">
     ${badgeDual}
@@ -981,7 +879,7 @@ function emailTomorrowItem(h: HighlightItem, e: ES): string {
 }
 
 // ISSUE 4 & 8: emailTimeBars — hours col width=45, nowrap, rounded hours, empty track #1e293b
-function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined, c: Palette, e: ES): string {
+function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefined, hoursWorked: number | null | undefined, c: DesignTokens, e: ES): string {
   if (!alloc || alloc.length === 0) return "";
   const totalH = alloc.reduce((s, t) => s + (t.hours ?? 0), 0);
   const totalStr = Number.isInteger(totalH) ? `${totalH}h` : `${totalH.toFixed(1)}h`;
@@ -991,14 +889,15 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
   const note = estimated
     ? `<tr><td style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-bottom:6px; font-family:Arial,Helvetica,sans-serif; font-style:italic;"><em>Hours not logged — estimated from reported activities</em></td></tr>` : "";
 
+  const barColors = getBarColors(c);
   const rows = alloc.map((t, i) => {
-    const color = BAR_COLORS[i % BAR_COLORS.length];
+    const color = barColors[i % barColors.length];
     const barPct = Math.min(100, Math.max(1, Math.round(t.percent)));
     const rest = 100 - barPct;
     // ISSUE 4: round hours to 1 decimal max
     const roundedHrs = Math.round(t.hours * 10) / 10;
     const hrs = estimated ? `~${roundedHrs}h` : `${roundedHrs}h`;
-    // ISSUE 8: empty track uses #1e293b (not c.bgSecondary)
+    // ISSUE 8: empty track uses #1e293b (not c.sectionBgAlt)
     return `<tr><td style="padding:2px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
   <td width="140" valign="top" style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-right:8px; padding-top:1px; white-space:nowrap; overflow:hidden; font-family:Arial,Helvetica,sans-serif;">${t.label}</td>
   <td valign="middle" style="padding:2px 4px 0;">
@@ -1009,7 +908,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
       <!--[if !mso]><!-->
       <td width="${barPct}%" height="8" bgcolor="${color}" style="background-color:${color}; font-size:1px; line-height:1px; border-radius:4px 0 0 4px; -webkit-border-radius:4px 0 0 4px;">&nbsp;</td>
       <!--<![endif]-->
-      ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
+      ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="${c.sectionBgAlt}" style="background-color:${c.sectionBgAlt}; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
     </tr></table>
   </td>
   <td width="50" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:${c.textSecondary}; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
@@ -1017,14 +916,14 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
   }).join("");
 
   return `<tr><td style="padding-top:16px;">
-  <div style="background-color:${c.bgSecondary}; padding:14px 16px; border-radius:8px; -webkit-border-radius:8px; border:1px solid ${c.borderTertiary};">
+  <div style="background-color:${c.sectionBgAlt}; padding:14px 16px; border-radius:8px; -webkit-border-radius:8px; border:1px solid ${c.border};">
     <div style="${e.catLabel} margin-bottom:8px;">${labelText}</div>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${note}${rows}</table>
   </div>
 </td></tr>`;
 }
 
-function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
+function emailPipelineGrid(snap: PipelineSnapshot, c: DesignTokens, e: ES): string {
   const tiles = [
     { label: "Hot Responsive",  value: snap.hot_responsive,  warn: false },
     { label: "Qualified",       value: snap.qualified,       warn: false },
@@ -1037,8 +936,8 @@ function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
   for (let i = 0; i < tiles.length; i += 3) {
     const chunk = tiles.slice(i, i + 3);
     rows += `<tr>${chunk.map(t => {
-      const numColor = t.warn ? c.textDueUrgent : c.textPrimary;
-      return `<td width="33%" align="center" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; padding:14px 10px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
+      const numColor = t.warn ? c.textUrgent : c.textPrimary;
+      return `<td width="33%" align="center" bgcolor="${c.sectionBgAlt}" style="background-color:${c.sectionBgAlt}; padding:14px 10px; border:1px solid ${c.border}; font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:22px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${numColor}; font-family:Arial,Helvetica,sans-serif;">${t.value ?? 0}</div>
   <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textTertiary}; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif; margin-top:4px;">${t.label}</div>
 </td>`;
@@ -1055,15 +954,15 @@ function emailPipelineGrid(snap: PipelineSnapshot, c: Palette, e: ES): string {
 </td></tr>`;
 }
 
-function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, personIdx: number = 0): string {
+function emailPersonCard(p: PersonData, ctx: RenderContext, c: DesignTokens, e: ES, personIdx: number = 0): string {
   const href = reportHref(p.name, ctx);
   const hoursStr = p.hoursWorked != null ? `${p.hoursWorked}h logged` : "Hours not logged";
 
   const effStatus = effectiveStatus(p, ctx);
   let tag: string;
-  if (effStatus === "standin") tag = emailBadgeDual(`Stand-in · ${p.daysSinceReport}d ago`, "#78350f", "#fcd34d");
-  else if (effStatus === "missing") tag = emailBadgeDual("Missing", "#7f1d1d", "#fca5a5");
-  else tag = emailBadgeDual("✓ Today", "#14532d", "#86efac");
+  if (effStatus === "standin") tag = emailBadgeDual(`Stand-in · ${p.daysSinceReport}d ago`, c.bgWarning, c.textUrgent);
+  else if (effStatus === "missing") tag = emailBadgeDual("Missing", c.bgDanger, c.textDanger);
+  else tag = emailBadgeDual("✓ Today", c.bgSuccess, c.textSuccess);
 
   const initials = avatarInitials(p.name);
   const av = avatarStyle(p.name, personIdx);
@@ -1075,7 +974,7 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
     let smRows = "";
     for (let i = 0; i < p.salesMetrics.length; i += 3) {
       const chunk = p.salesMetrics.slice(i, i + 3);
-      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="${c.bgSecondary}" style="background-color:${c.bgSecondary}; padding:14px 10px; border:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
+      smRows += `<tr>${chunk.map(m => `<td width="33%" align="center" bgcolor="${c.sectionBgAlt}" style="background-color:${c.sectionBgAlt}; padding:14px 10px; border:1px solid ${c.border}; font-family:Arial,Helvetica,sans-serif;">
   <div style="font-size:20px; line-height:28px; mso-line-height-rule:exactly; font-weight:600; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif;">${m.value}</div>
   <div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textSecondary}; text-transform:uppercase; letter-spacing:0.05em; font-family:Arial,Helvetica,sans-serif;">${m.label}</div>
 </td>`).join("")}</tr>`;
@@ -1119,14 +1018,14 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
 
   // Person card with consistent 16px margin-bottom, proper border treatment
   return `<!--[if mso]>
-<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.headerAccentBorder}" width="100%" style="background-color:${c.bgPrimary}; margin-bottom:18px; border-collapse:separate;">
-<tr><td style="padding:0; background-color:${c.bgPrimary};">
+<table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.accentPrimaryBorder}" width="100%" style="background-color:${c.sectionBg}; margin-bottom:18px; border-collapse:separate;">
+<tr><td style="padding:0; background-color:${c.sectionBg};">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-  <tr><td style="padding:18px 22px; background-color:${c.headerAccent}; border-bottom:2px solid ${c.headerAccentBorder};">
+  <tr><td style="padding:18px 22px; background-color:${c.accentPrimaryBg}; border-bottom:2px solid ${c.accentPrimaryBorder};">
 <![endif]-->
 <!--[if !mso]><!-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgPrimary}; border:1px solid ${c.borderTertiary}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:18px;">
-<tr><td style="padding:18px 22px; background-color:${c.headerAccent}; border-bottom:2px solid ${c.headerAccentBorder}; border-radius:12px 12px 0 0; -webkit-border-radius:12px 12px 0 0; font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.sectionBg}; border:1px solid ${c.border}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:18px;">
+<tr><td style="padding:18px 22px; background-color:${c.accentPrimaryBg}; border-bottom:2px solid ${c.accentPrimaryBorder}; border-radius:12px 12px 0 0; -webkit-border-radius:12px 12px 0 0; font-family:Arial,Helvetica,sans-serif;">
 <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
         <td width="44" valign="top" style="padding-right:12px; width:44px; vertical-align:top;">
@@ -1138,14 +1037,14 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
           <!--<![endif]-->
         </td>
         <td style="vertical-align:middle; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">
-          <div style="font-size:16px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif;">${p.name}</div>
-          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#cbd5e1; font-family:Arial,Helvetica,sans-serif; margin-top:3px;">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
+          <div style="font-size:16px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.accentPrimaryText}; font-family:Arial,Helvetica,sans-serif;">${p.name}</div>
+          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-family:Arial,Helvetica,sans-serif; margin-top:3px;">${hoursStr}${viewLinkHtml ? ` · ${viewLinkHtml}` : ""}</div>
         </td>
         <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:12px;">${tag}</td>
       </tr></table>
     </td>
   </tr>
-  ${hasBody ? `<tr><td style="padding:18px 22px; background-color:${c.bgPrimary}; font-family:Arial,Helvetica,sans-serif;">
+  ${hasBody ? `<tr><td style="padding:18px 22px; background-color:${c.sectionBg}; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       ${pipelineHtml}${ontackHtml}${blockersHtml}${tomorrowHtml}${overflowHtml}
       ${emailTimeBars(p.timeAllocation ?? [], p.timeAllocationEstimated, p.hoursWorked, c, e)}
@@ -1161,23 +1060,23 @@ function emailPersonCard(p: PersonData, ctx: RenderContext, c: Palette, e: ES, p
 <!--<![endif]-->`;
 }
 
-function emailDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, e: ES, startIdx: number = 0): string {
+function emailDeptSection(dept: DepartmentData, ctx: RenderContext, c: DesignTokens, e: ES, startIdx: number = 0): string {
   const statusPill = dept.statusOk
-    ? emailStatusBadgeDual("all reported", "#14532d", "#86efac")
-    : `<span style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#f59e0b; font-family:Arial,Helvetica,sans-serif;">${dept.statusLabel}</span>`;
+    ? emailStatusBadgeDual("all reported", c.bgSuccess, c.textSuccess)
+    : `<span style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textUrgent}; font-family:Arial,Helvetica,sans-serif;">${dept.statusLabel}</span>`;
 
   // Department header bar with blue accent — increased margin for spacing
   const deptBar = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:28px 0 12px;">
   <tr>
-    <td width="4" bgcolor="${c.headerAccentBorder}" style="background-color:${c.headerAccentBorder}; font-size:0; line-height:0;">&nbsp;</td>
+    <td width="4" bgcolor="${c.accentPrimaryBorder}" style="background-color:${c.accentPrimaryBorder}; font-size:0; line-height:0;">&nbsp;</td>
     <!--[if mso]>
-    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:14px 18px; border:1px solid ${c.headerAccentBorder}; font-family:Arial,Helvetica,sans-serif;">
+    <td bgcolor="${c.accentPrimaryBg}" style="background-color:${c.accentPrimaryBg}; padding:14px 18px; border:1px solid ${c.accentPrimaryBorder}; font-family:Arial,Helvetica,sans-serif;">
     <![endif]-->
     <!--[if !mso]><!-->
-    <td style="background-color:${c.headerAccent}; padding:14px 18px; border:1px solid ${c.headerAccentBorder}; border-left:none; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0; font-family:Arial,Helvetica,sans-serif;">
+    <td style="background-color:${c.accentPrimaryBg}; padding:14px 18px; border:1px solid ${c.accentPrimaryBorder}; border-left:none; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0; font-family:Arial,Helvetica,sans-serif;">
     <!--<![endif]-->
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-        <td style="font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
+        <td style="font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; color:${c.accentPrimaryText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${dept.emoji} ${dept.name}</td>
         <td style="text-align:right; white-space:nowrap; padding-left:12px;">${statusPill}</td>
       </tr></table>
     </td>
@@ -1187,16 +1086,16 @@ function emailDeptSection(dept: DepartmentData, ctx: RenderContext, c: Palette, 
   // Person cards wrapped in tinted rail so white cards float on gray background
   const personCards = (dept.people ?? []).map((p, i) => emailPersonCard(p, ctx, c, e, startIdx + i)).join("");
 
-  return deptBar + `<div style="background-color:${c.bgSecondary}; padding:16px; border-radius:14px; -webkit-border-radius:14px; margin-bottom:24px;">${personCards}</div>`;
+  return deptBar + `<div style="background-color:${c.sectionBgAlt}; padding:16px; border-radius:14px; -webkit-border-radius:14px; margin-bottom:24px;">${personCards}</div>`;
 }
 
 // ISSUE 1 & 2: emailNeedsAttention — dual-render badges, card bg #111827 border #1e293b
-function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
+function emailNeedsAttention(data: AiSummaryData, c: DesignTokens, e: ES): string {
   const items = (data.needsAttentionNow ?? []).slice().sort((a, b) => (b.daysOverdue ?? 0) - (a.daysOverdue ?? 0));
   const waiting = data.waitingOnExternal ?? [];
   if (items.length === 0 && waiting.length === 0) {
     return `<tr><td style="padding:8px 0 24px; font-family:Arial,Helvetica,sans-serif;">
-  <div style="background-color:${c.bgSecondary}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
+  <div style="background-color:${c.sectionBgAlt}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
     <div style="${e.secLabel}">🔥 Needs attention now</div>
     <div style="${e.card} font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textSuccess}; font-family:Arial,Helvetica,sans-serif;">🟢 No overdue, blocked, or imminently due items today.</div>
   </div>
@@ -1209,9 +1108,9 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
     for (const item of deptItems) {
       // ISSUE 1: dual-render badges for overdue/due soon
       const badgeDual = item.status === "overdue"
-        ? emailStatusBadgeDual(`OVERDUE${item.daysOverdue ? ` ${item.daysOverdue}d` : ""}`, "#7f1d1d", "#fca5a5")
+        ? emailStatusBadgeDual(`OVERDUE${item.daysOverdue ? ` ${item.daysOverdue}d` : ""}`, c.bgDanger, c.textDanger)
         : (item.status === "imminentlyDue" || item.status === "dueSoon")
-        ? emailStatusBadgeDual("DUE SOON", "#78350f", "#fcd34d") : "";
+        ? emailStatusBadgeDual("DUE SOON", c.bgWarning, c.textUrgent) : "";
       const icon = item.status === "blocked" ? "🚨" : "⚠️";
       const dueStr = item.dueDate ? (() => {
         const iso = mdToISO(item.dueDate!);
@@ -1219,11 +1118,11 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
         const isOverdue = item.status === "overdue";
         const isUrgent = item.status === "imminentlyDue" || item.status === "dueSoon";
         const prefix = isOverdue ? "was due" : "due";
-        const dateColor = isOverdue ? "#f87171" : (isUrgent ? "#fcd34d" : c.textTertiary);
+        const dateColor = isOverdue ? c.textOverdue : (isUrgent ? c.textUrgent : c.textTertiary);
         const className = isOverdue ? "due-overdue" : isUrgent ? "due-urgent" : "due-normal";
         return ` · <span class="${className}" style="color:${dateColor}; font-weight:700;">${prefix} ${fmt}</span>`;
       })() : "";
-      rows += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:8px; border-bottom:1px solid ${c.borderTertiary};"><tr>
+      rows += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:8px; border-bottom:1px solid ${c.border};"><tr>
   <td width="22" valign="top" style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; padding:8px 6px 8px 0;">${icon}</td>
   ${badgeDual ? `<td style="padding:8px 8px 8px 0; vertical-align:top; white-space:nowrap;">${badgeDual}</td>` : ""}
   <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif; padding:8px 0; vertical-align:top; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${item.text}${dueStr}</td>
@@ -1231,21 +1130,21 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
     }
   }
   if (waiting.length > 0) {
-    rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:${c.textTertiary}; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; padding:10px 0 6px; border-top:1px solid ${c.borderTertiary}; margin-top:6px;">⏳ Waiting on External</div>`;
+    rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:${c.textTertiary}; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; padding:10px 0 6px; border-top:1px solid ${c.border}; margin-top:6px;">⏳ Waiting on External</div>`;
     for (const w of waiting) {
-      const highlighted = w.text.replace(/\b(Scott(?:\s+and\s+Kellie)?|Kellie|Creative Team|John|Nova|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g, `<span style="color:#818cf8;">$1</span>`);
-      rows += `<div style="font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#64748b; padding:2px 0; font-family:Arial,Helvetica,sans-serif;">· ${highlighted} <span style="color:#475569;">(${w.who})</span></div>`;
+      const highlighted = w.text.replace(/\b(Scott(?:\s+and\s+Kellie)?|Kellie|Creative Team|John|Nova|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g, `<span style="color:${c.accentPrimary};">$1</span>`);
+      rows += `<div style="font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:${c.textTertiary}; padding:2px 0; font-family:Arial,Helvetica,sans-serif;">· ${highlighted} <span style="color:${c.textSecondary};">(${w.who})</span></div>`;
     }
   }
   return `<tr><td style="padding:8px 0 24px; font-family:Arial,Helvetica,sans-serif;">
-  <div style="background-color:${c.bgSecondary}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
+  <div style="background-color:${c.sectionBgAlt}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
     <div style="${e.secLabel}">🔥 Needs attention now</div>
     <!--[if mso]>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.borderTertiary}" width="100%" style="background-color:${c.bgPrimary}; margin-bottom:12px;">
-    <tr><td style="padding:14px 20px; background-color:${c.bgPrimary}; font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.border}" width="100%" style="background-color:${c.sectionBg}; margin-bottom:12px;">
+    <tr><td style="padding:14px 20px; background-color:${c.sectionBg}; font-family:Arial,Helvetica,sans-serif;">
     <![endif]-->
     <!--[if !mso]><!-->
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgPrimary}; border:1px solid ${c.borderTertiary}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.sectionBg}; border:1px solid ${c.border}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
     <tr><td style="padding:14px 20px; font-family:Arial,Helvetica,sans-serif;">
     <!--<![endif]-->
     ${rows}
@@ -1255,7 +1154,7 @@ function emailNeedsAttention(data: AiSummaryData, c: Palette, e: ES): string {
 </td></tr>`;
 }
 
-function emailNotableProgress(data: AiSummaryData, c: Palette): string {
+function emailNotableProgress(data: AiSummaryData, c: DesignTokens): string {
   const groups = normalizeProgress(data.notableProgress);
   if (groups.length === 0) return "";
   let rows = "";
@@ -1263,29 +1162,29 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
   for (const g of groups) {
     if (g.department) {
       const mt = firstDept ? "0" : "14px";
-      rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:${c.textProgressLabel}; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; margin:${mt} 0 6px; border-bottom:1px solid ${c.borderProgress}; padding-bottom:4px;">${g.department}</div>`;
+      rows += `<div style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; font-weight:500; color:${c.textSuccess}; text-transform:uppercase; letter-spacing:.06em; font-family:Arial,Helvetica,sans-serif; margin:${mt} 0 6px; border-bottom:1px solid ${c.borderSuccess}; padding-bottom:4px;">${g.department}</div>`;
       firstDept = false;
     }
     for (const item of (g.items ?? [])) {
       rows += `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:4px;"><tr>
   <td width="22" valign="top" style="font-size:14px; line-height:20px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif;">✅</td>
-  <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textProgress}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${stripCheckmark(item)}</td>
+  <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textSuccess}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${stripCheckmark(item)}</td>
 </tr></table>`;
     }
     if (g.overflowNote) rows += `<div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-family:Arial,Helvetica,sans-serif; font-style:italic; margin-top:4px;"><em>${g.overflowNote}</em></div>`;
   }
   // Notable Progress — label INSIDE the green box, green border around entire section, wrapped in bgSecondary rail
   return `<tr><td style="padding:8px 0 24px; font-family:Arial,Helvetica,sans-serif;">
-  <div style="background-color:${c.bgSecondary}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
+  <div style="background-color:${c.sectionBgAlt}; padding:16px; border-radius:14px; -webkit-border-radius:14px;">
     <!--[if mso]>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.borderProgress}" width="100%" style="background-color:${c.bgProgress}; margin-bottom:12px;">
-    <tr><td style="padding:16px 20px; background-color:${c.bgProgress}; font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.borderSuccess}" width="100%" style="background-color:${c.bgSuccess}; margin-bottom:12px;">
+    <tr><td style="padding:16px 20px; background-color:${c.bgSuccess}; font-family:Arial,Helvetica,sans-serif;">
     <![endif]-->
     <!--[if !mso]><!-->
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgProgress}; border:1px solid ${c.borderProgress}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.bgSuccess}; border:1px solid ${c.borderSuccess}; border-radius:12px; -webkit-border-radius:12px; overflow:hidden; margin-bottom:12px;">
     <tr><td style="padding:16px 20px; font-family:Arial,Helvetica,sans-serif;">
     <!--<![endif]-->
-      <div style="font-size:11px; font-weight:600; color:${c.textProgressLabel}; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif; mso-line-height-rule:exactly; margin-bottom:12px;">🏆 Notable progress today</div>
+      <div style="font-size:11px; font-weight:600; color:${c.textSuccess}; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif; mso-line-height-rule:exactly; margin-bottom:12px;">🏆 Notable progress today</div>
       ${rows}
     </td></tr>
     </table>
@@ -1294,7 +1193,7 @@ function emailNotableProgress(data: AiSummaryData, c: Palette): string {
 }
 
 // ISSUE 2: MSO conditional scorecard pills in emailPulse
-function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES): string {
+function emailPulse(data: AiSummaryData, ctx: RenderContext, c: DesignTokens, e: ES): string {
   const cs = data.completenessScore;
   const fresh = cs?.freshToday ?? 0;
   const pct = cs?.percentage ?? 0;
@@ -1317,9 +1216,9 @@ function emailPulse(data: AiSummaryData, ctx: RenderContext, c: Palette, e: ES):
   <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-weight:500; color:#f59e0b; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; font-family:Arial,Helvetica,sans-serif;">⚡ Today's Pulse · ${dateLabel}</div>
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;">
   <tr>
-    <td width="4" bgcolor="${c.headerAccentBorder}" style="background-color:${c.headerAccentBorder}; font-size:0; line-height:0;">&nbsp;</td>
-    <td bgcolor="${c.headerAccent}" style="background-color:${c.headerAccent}; padding:16px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
-      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.headerAccentText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse ?? ""}</div>
+    <td width="4" bgcolor="${c.accentPrimaryBorder}" style="background-color:${c.accentPrimaryBorder}; font-size:0; line-height:0;">&nbsp;</td>
+    <td bgcolor="${c.accentPrimaryBg}" style="background-color:${c.accentPrimaryBg}; padding:16px; font-family:Arial,Helvetica,sans-serif; border-radius:0 8px 8px 0; -webkit-border-radius:0 8px 8px 0;">
+      <div style="font-size:16px; line-height:24px; mso-line-height-rule:exactly; font-weight:500; color:${c.accentPrimaryText}; font-family:Arial,Helvetica,sans-serif; word-break:normal; word-wrap:break-word; mso-line-break-override:none;">${data.todaysPulse ?? ""}</div>
     </td>
   </tr>
   </table>
@@ -1353,7 +1252,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <body style="margin:0; padding:0; background-color:${c.pageBodyBg};">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${c.pageBodyBg};">
 <tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background-color:${c.bgPrimary}; border:1px solid ${c.borderTertiary};">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background-color:${c.sectionBg}; border:1px solid ${c.border};">
   <tr><td style="padding:32px 36px;">
     <div style="font-size:11px; line-height:16px; color:${c.textTertiary}; text-transform:uppercase; letter-spacing:.1em; font-weight:500; font-family:Arial,Helvetica,sans-serif; margin-bottom:8px;">&#9889; Daily Pulse · ${formattedDate}</div>
     <div style="font-size:20px; line-height:28px; font-weight:700; color:${c.textPrimary}; font-family:Arial,Helvetica,sans-serif; margin-bottom:20px;">${orgName}</div>
@@ -1362,7 +1261,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
       <a href="${pdfUrl}" style="display:inline-block; background:${c.buttonBg}; color:${c.buttonText}; text-decoration:none; font-size:13px; font-weight:600; padding:12px 28px; font-family:Arial,Helvetica,sans-serif;">View Online &#8594;</a>
     </div>` : ""}
   </td></tr>
-  <tr><td style="padding:16px 36px; border-top:1px solid ${c.borderTertiary};">
+  <tr><td style="padding:16px 36px; border-top:1px solid ${c.border};">
     <div style="font-size:10px; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif;">${orgName} · Sent by OrgRise AI</div>
   </td></tr>
 </table>
@@ -1374,7 +1273,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 
   const notExpected = (data.departments ?? []).filter(d => d.notExpectedToday);
   const notExpectedRow = notExpected.length > 0
-    ? `<tr><td style="padding:0 0 12px; font-family:Arial,Helvetica,sans-serif;"><div style="background-color:${c.bgSecondary}; padding:10px 16px; font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-family:Arial,Helvetica,sans-serif;">${notExpected.map(d => `${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}`).join(" &nbsp;·&nbsp; ")}</div></td></tr>` : "";
+    ? `<tr><td style="padding:0 0 12px; font-family:Arial,Helvetica,sans-serif;"><div style="background-color:${c.sectionBgAlt}; padding:10px 16px; font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textSecondary}; font-family:Arial,Helvetica,sans-serif;">${notExpected.map(d => `${d.emoji} ${d.name} — ${d.scheduleLabel ?? "not reporting today"}`).join(" &nbsp;·&nbsp; ")}</div></td></tr>` : "";
 
   let personGlobalIdx = 0;
   const deptRows = (data.departments ?? [])
@@ -1386,7 +1285,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     }).join("");
 
   const pdfCta = pdfUrl
-    ? `<tr><td style="text-align:center; padding:16px 0 8px; font-family:Arial,Helvetica,sans-serif;"><a href="${pdfUrl}" style="display:inline-block; background:#4f46e5; color:#fff; text-decoration:none; font-size:13px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; padding:11px 26px; border-radius:8px; -webkit-border-radius:8px; font-family:Arial,Helvetica,sans-serif;">View &amp; Download Full PDF Report</a></td></tr>` : "";
+    ? `<tr><td style="text-align:center; padding:16px 0 8px; font-family:Arial,Helvetica,sans-serif;"><a href="${pdfUrl}" style="display:inline-block; background:${c.buttonBg}; color:${c.buttonText}; text-decoration:none; font-size:13px; line-height:20px; mso-line-height-rule:exactly; font-weight:600; padding:11px 26px; border-radius:8px; -webkit-border-radius:8px; font-family:Arial,Helvetica,sans-serif;">View &amp; Download Full PDF Report</a></td></tr>` : "";
 
   const cs = data.completenessScore;
   const fresh = cs?.freshToday ?? 0;
@@ -1397,20 +1296,20 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
     <!-- Status line -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
     <tr>
-      <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:#94a3b8; font-family:Arial,Helvetica,sans-serif;">
+      <td style="font-size:13px; line-height:20px; mso-line-height-rule:exactly; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif;">
         ${fresh} of ${cs?.totalExpected ?? fresh} reported &nbsp;&#183;&nbsp; ${formattedDate}
       </td>
     </tr>
     </table>
     <!-- Big CTA button -->
     ${pdfUrl ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="100%"><tr><td align="center">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="#4f46e5" style="background-color:#4f46e5;"><tr>
-        <td style="padding:16px 40px; background-color:#4f46e5; font-family:Arial,Helvetica,sans-serif; text-align:center;">
-          <a href="${pdfUrl}" style="color:#ffffff; text-decoration:none; font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; font-family:Arial,Helvetica,sans-serif;">View Full Report &#8594;</a>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="1" bordercolor="${c.buttonBg}" style="background-color:${c.buttonBg};"><tr>
+        <td style="padding:16px 40px; background-color:${c.buttonBg}; font-family:Arial,Helvetica,sans-serif; text-align:center;">
+          <a href="${pdfUrl}" style="color:${c.buttonText}; text-decoration:none; font-size:15px; line-height:22px; mso-line-height-rule:exactly; font-weight:600; font-family:Arial,Helvetica,sans-serif;">View Full Report &#8594;</a>
         </td>
       </tr></table>
     </td></tr></table>` : ""}
-    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#64748b; font-family:Arial,Helvetica,sans-serif; text-align:center; margin-top:14px;">Your full executive summary with detailed reports for each team member is available at the link above.</div>
+    <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif; text-align:center; margin-top:14px;">Your full executive summary with detailed reports for each team member is available at the link above.</div>
   </td></tr>`;
 
   return `<!DOCTYPE html>
@@ -1443,17 +1342,17 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   }
   /* Force due date spans to override any auto-detection */
   .due-overdue {
-    color: #f87171 !important;
+    color: ${c.textOverdue} !important;
     font-weight: 700 !important;
     text-decoration: none !important;
   }
   .due-urgent {
-    color: #fcd34d !important;
+    color: ${c.textUrgent} !important;
     font-weight: 700 !important;
     text-decoration: none !important;
   }
   .due-normal {
-    color: #94a3b8 !important;
+    color: ${c.textTertiary} !important;
     text-decoration: none !important;
   }
   @media screen {
@@ -1468,13 +1367,13 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" align="center" style="table-layout:fixed; width:700px;">
 <tr><td style="width:700px; padding:0;">
 <![endif]-->
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" class="${ctx.theme === "light" ? "light-card" : ""}" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:${c.pageBg}; border:1px solid ${c.borderTertiary}; box-shadow:0 4px 24px rgba(15,23,42,0.08), 0 1px 3px rgba(15,23,42,0.06);">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="700" class="${ctx.theme === "light" ? "light-card" : ""}" style="max-width:700px; table-layout:fixed; word-wrap:break-word; overflow:hidden; background-color:${c.pageBg}; border:1px solid ${c.border}; box-shadow:0 4px 24px rgba(15,23,42,0.08), 0 1px 3px rgba(15,23,42,0.06);">
 
   <!-- ═══ HEADER — both clients see this ═══ -->
-  <tr><td style="background-color:${c.navy}; padding:24px 32px 20px; font-family:Arial,Helvetica,sans-serif;">
+  <tr><td style="background-color:${c.headerBg}; padding:24px 32px 20px; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td valign="top" style="font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-size:17px; line-height:24px; mso-line-height-rule:exactly; font-weight:700; color:#ffffff; font-family:Arial,Helvetica,sans-serif;">${orgName}</div>
+        <div style="font-size:17px; line-height:24px; mso-line-height-rule:exactly; font-weight:700; color:${c.headerText}; font-family:Arial,Helvetica,sans-serif;">${orgName}</div>
         <div style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:rgba(255,255,255,0.55); margin-top:3px; text-transform:uppercase; letter-spacing:.08em; font-family:Arial,Helvetica,sans-serif;">Executive Summary</div>
       </td>
       <td style="text-align:right; vertical-align:top; white-space:nowrap; padding-left:16px;">
@@ -1504,7 +1403,7 @@ export function renderEmailHtml(data: AiSummaryData, ctx: RenderContext): string
   <!--<![endif]-->
 
   <!-- ═══ FOOTER — both clients see this ═══ -->
-  <tr><td style="padding:14px 28px; border-top:1px solid ${c.borderTertiary}; font-family:Arial,Helvetica,sans-serif;">
+  <tr><td style="padding:14px 28px; border-top:1px solid ${c.border}; font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <td style="font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif;">${orgName} · Confidential</td>
       <td style="text-align:right; font-size:10px; line-height:14px; mso-line-height-rule:exactly; color:${c.textTertiary}; font-family:Arial,Helvetica,sans-serif;">Sent by OrgRise AI</td>
