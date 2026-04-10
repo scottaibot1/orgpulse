@@ -1,9 +1,18 @@
 #!/usr/bin/env node
-// render-email.ts — generates email HTML template
-// Run: node --experimental-strip-types scripts/render-email.ts
+// render-email.mjs — generates the email HTML template
+// Run: node_modules/.bin/jiti scripts/render-email.mjs
 
+import { createRequire } from 'module';
 import { writeFileSync } from 'fs';
-import { renderEmailHtml } from '../lib/report-renderer.ts';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+
+const jiti = require(join(__dirname, '../node_modules/jiti/dist/jiti.js'));
+const jitiLoader = jiti(fileURLToPath(import.meta.url), { interopDefault: true });
+const { renderEmailHtml } = jitiLoader(join(__dirname, '../lib/report-renderer.ts'));
 
 const data = {
   todaysPulse: "Reservations resolved a high-stakes VRBO capacity violation and cleared every guest queue while Sales pushed 2 hot deals toward close and generated 5 new inbound inquiries — but Arturo carries 6 overdue projects at Private Paradise and the travel agent partnership expansion is blocked waiting on executive approval.",
@@ -186,7 +195,7 @@ const ctx = {
   theme: "dark",
 };
 
-const html = renderEmailHtml(data as any, ctx as any);
+const html = renderEmailHtml(data, ctx);
 const outPath = '/Users/scott/Desktop/email-template.html';
 writeFileSync(outPath, html, 'utf8');
 console.log(`Written to ${outPath} (${html.length.toLocaleString()} chars)`);

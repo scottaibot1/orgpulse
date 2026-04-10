@@ -1,0 +1,315 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.r{padding:1.5rem 0;max-width:880px;font-family:var(--font-sans)}
+.pulse{background:#0f172a;border-radius:var(--border-radius-lg);padding:1.5rem;margin-bottom:1.5rem}
+.pulse-label{font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem}
+.pulse-headline{font-size:16px;font-weight:500;color:#f1f5f9;line-height:1.6;margin-bottom:1rem}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:12px;padding:4px 12px;border-radius:20px;font-weight:500}
+.pill-ok{background:#14532d;color:#86efac}
+.pill-warn{background:#78350f;color:#fcd34d}
+.pill-neutral{background:#1e293b;color:#94a3b8}
+.sec-label{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:1.5rem 0 .75rem}
+.card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:.75rem}
+.dept-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.08em;margin:.75rem 0 .35rem}
+.dept-label:first-child{margin-top:0}
+.attn-row{display:flex;gap:10px;align-items:flex-start;padding:.6rem 0;border-bottom:.5px solid var(--color-border-tertiary)}
+.attn-row:last-child{border-bottom:none}
+.attn-icon{font-size:14px;flex-shrink:0;margin-top:2px}
+.attn-body{font-size:13px;color:var(--color-text-primary);line-height:1.5}
+.attn-action{font-size:12px;color:var(--color-text-info);margin-top:3px;font-style:italic}
+.overdue-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-danger);color:var(--color-text-danger);padding:2px 7px;border-radius:10px;margin-right:6px}
+.urgent-badge{display:inline-block;font-size:10px;font-weight:500;background:var(--color-background-warning);color:var(--color-text-warning);padding:2px 7px;border-radius:10px;margin-right:6px}
+.notable-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--color-text-primary);line-height:1.5;padding:3px 0}
+.person-card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:1rem;overflow:hidden}
+.person-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-bottom:.5px solid var(--color-border-tertiary)}
+.person-name{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.person-meta{font-size:12px;color:var(--color-text-secondary);margin-top:2px}
+.person-body{padding:1rem 1.25rem}
+.cat-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:.85rem 0 .35rem}
+.cat-label:first-child{margin-top:0}
+.task{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--color-text-primary);line-height:1.5;padding:2px 0}
+.task-meta{font-size:11px;color:var(--color-text-secondary);margin-left:4px}
+.task-meta.overdue{color:var(--color-text-danger)}
+.check{width:16px;height:16px;border-radius:3px;background:var(--color-background-success);border:.5px solid var(--color-border-success);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
+.warn-icon{width:16px;height:16px;border-radius:3px;background:var(--color-background-warning);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
+.block-icon{width:16px;height:16px;border-radius:3px;background:var(--color-background-danger);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px}
+.bullet{width:6px;height:6px;border-radius:50%;background:#378ADD;flex-shrink:0;margin-top:5px}
+.timebar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;color:var(--color-text-secondary)}
+.timebar-label{width:140px;flex-shrink:0;line-height:1.3}
+.timebar-track{flex:1;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden}
+.timebar-fill{height:100%;border-radius:2px}
+.view-link{font-size:11px;color:var(--color-text-info);text-decoration:none;white-space:nowrap}
+.tag-fresh{font-size:10px;background:var(--color-background-success);color:var(--color-text-success);padding:2px 8px;border-radius:10px}
+.subcat{font-size:10px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0 .2rem}
+.pct{font-size:11px;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:1px 6px;border-radius:8px;margin-left:4px;white-space:nowrap}
+.due{font-size:11px;color:var(--color-text-secondary);margin-left:4px;white-space:nowrap}
+.due.od{color:var(--color-text-danger)}
+.tmrow-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--color-text-secondary);padding:2px 0}
+.dept-header-bar{display:flex;align-items:center;justify-content:space-between;background:#0f172a;border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:1rem 0 .5rem}
+.dept-header-bar-name{font-size:13px;font-weight:500;color:#e2e8f0}
+.dept-header-bar-status{font-size:11px;color:#22c55e}
+</style>
+
+<div class="r">
+
+<div class="pulse">
+  <div class="pulse-label">⚡ Today's Pulse · Tuesday, March 31, 2026</div>
+  <div class="pulse-headline">Reservations resolved a high-stakes VRBO capacity violation and cleared every guest queue while Sales pushed 2 hot deals toward close and generated 5 new inbound inquiries — but Arturo carries 6 overdue projects at Private Paradise and the travel agent partnership expansion is blocked waiting on executive approval.</div>
+  <div class="pills">
+    <span class="pill pill-ok">4 submitted</span>
+    <span class="pill pill-ok">100% rate</span>
+    <span class="pill pill-neutral">~24h logged</span>
+    <span class="pill pill-neutral">4 depts active</span>
+  </div>
+</div>
+
+<div class="sec-label">🔥 Needs attention now</div>
+<div class="card">
+  <div class="dept-label">Private Paradise — Overdue projects</div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="overdue-badge">OVERDUE 356 days</span>In-house waterslide sealing — John brought materials but work is stalled at 70% · was due 4/10/25</div>
+      <div class="attn-action">Confirm with John whether this is blocked or needs to be scheduled — it has been open over a year</div>
+    </div>
+  </div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="overdue-badge">OVERDUE 356 days</span>A/C units preventive maintenance units 1–5 — waiting on vacancy, stalled at 50% · was due 4/10/25</div>
+      <div class="attn-action">Assign a vacancy window this week or escalate — this is over a year overdue</div>
+    </div>
+  </div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="overdue-badge">OVERDUE 1 day</span>PP Security cost-saving proposal — 0% complete, never started · was due 3/31</div>
+      <div class="attn-action">Arturo to start this immediately — security cost savings directly impact margin</div>
+    </div>
+  </div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="overdue-badge">OVERDUE 1 day</span>Pavers project — still sourcing 3rd vendor quote, 25% complete · was due 3/31</div>
+      <div class="attn-action">Arturo to close vendor list today and bring recommendation to John</div>
+    </div>
+  </div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="overdue-badge">OVERDUE 1 day</span>Telmex WiFi intensity optimization — line working but suboptimal, 80% · was due 3/30</div>
+      <div class="attn-action">Escalate to Telmex if internal fix not available — connectivity affects guest experience</div>
+    </div>
+  </div>
+  <div class="dept-label" style="margin-top:.75rem">Sales — executive action required</div>
+  <div class="attn-row">
+    <div class="attn-icon">🚨</div>
+    <div>
+      <div class="attn-body">Travel agent vetting form completed and waiting for executive approval — blocking all downstream retreat leader and personal concierge partner outreach (Bella, Sales)</div>
+      <div class="attn-action">Approve form today to unlock the partner channel</div>
+    </div>
+  </div>
+  <div class="dept-label" style="margin-top:.75rem">Reservations — coming due</div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body"><span class="urgent-badge">DUE TODAY</span>Clean email list — high priority, 0%, blocked on other items being ready · due 3/31</div>
+      <div class="attn-action">Review dependency chain with Alan — this keeps slipping</div>
+    </div>
+  </div>
+  <div class="attn-row">
+    <div class="attn-icon">⚠️</div>
+    <div>
+      <div class="attn-body">AI templates for US homes — 50% complete, sent to Scott and Kellie on March 19, no feedback received · due 3/30 (overdue)</div>
+      <div class="attn-action">Scott and Kellie to review and respond so Alan can close this out</div>
+    </div>
+  </div>
+</div>
+
+<div class="sec-label">🏆 Notable progress today</div>
+<div class="card">
+  <div class="dept-label">Reservations</div>
+  <div class="notable-item"><span style="font-size:14px">🏆</span>Alan negotiated penalty-free VRBO cancellation for FFE tenant with 25 sleeping / 35 visiting — capacity violation resolved after 3+ hours of platform calls, saving the company from financial penalties</div>
+  <div class="notable-item"><span style="font-size:14px">✅</span>Alan finalized wedding quote with Kellie including full payment structure, created multihome calendar in Owner Rez shared with Hayrol, and resolved undated PP customer check with tenant authorization</div>
+  <div class="notable-item"><span style="font-size:14px">✅</span>Antonio completed 100% of FFE rules calls and sent all quotes, prepared PP F&B quotes and preference sheets for Isabella's guests, cleared the full reservations inbox</div>
+  <div class="dept-label">Sales</div>
+  <div class="notable-item"><span style="font-size:14px">🚀</span>Bella contacted 10 leads, received 5 new inbound inquiries in one day, sent 2 proposals, and completed travel agent vetting form — pipeline at 124 qualified leads with 2 hot deals (Laura Kessler and Imani Allen) actively moving toward close</div>
+  <div class="dept-label">Private Paradise</div>
+  <div class="notable-item"><span style="font-size:14px">✅</span>Arturo secured apartment rental with deposit, approved payroll, received waterslide preventive maintenance materials from John, communicated safety guidelines to guests, and held strategic alignment meeting with John and Scott</div>
+  <div class="notable-item"><span style="font-size:14px">✅</span>UV light installed and working, ping pong table assembled, deck umbrella up, ceviche spoons delivered, gardener uniforms upgraded to PP logo rashguards — 5 physical property improvements closed today</div>
+</div>
+
+<div class="sec-label">👤 Individual reports</div>
+
+<div class="dept-header-bar">
+  <span class="dept-header-bar-name">📦 Reservations</span>
+  <span class="dept-header-bar-status">All reported</span>
+</div>
+
+<div class="person-card">
+  <div class="person-header">
+    <div>
+      <div class="person-name">Alan Arceo Mejia</div>
+      <div class="person-meta">Reservations · 9.2h logged · <span class="tag-fresh">Today</span> · <a class="view-link" href="#">View Submitted Report →</a></div>
+    </div>
+  </div>
+  <div class="person-body">
+    <div class="cat-label">In progress</div>
+    <div class="subcat">Marketing initiatives</div>
+    <div class="task"><div class="warn-icon">⚠</div>AI templates for US homes — sent to Scott and Kellie 3/19, no review received<span class="due od">· was due 3/30</span><span class="pct">50%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>Clean email list — blocked waiting on emails to be finalized<span class="due od">· due today 3/31</span><span class="pct">0%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>4-star reviews strategy — meeting with Kellie rescheduled, Airbnb call took priority<span class="due">· due 4/11</span><span class="pct">15%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>US home calendar competitor analysis — complex task, taking several days<span class="due">· due 4/15</span><span class="pct">25%</span></div>
+    <div class="subcat">Platform & operations</div>
+    <div class="task"><div class="bullet"></div>6 emails from John into Nutshell — settled on no changes except Bella's name, sent to Nova for deadline<span class="due">· due 4/4</span><span class="pct">40%</span></div>
+    <div class="task"><div class="bullet"></div>Book now instant booking analysis — Owner Rez confirmed capability per property<span class="due">· due 3/28</span><span class="pct">80%</span></div>
+    <div class="task"><div class="bullet"></div>PP after-booking email restructure — delayed<span class="due">· due 4/15</span><span class="pct">0%</span></div>
+    <div class="task"><div class="bullet"></div>STS to Paradigm migration — waiting on new Paradigm website to avoid SEO damage<span class="pct">0%</span></div>
+    <div class="task"><div class="bullet"></div>AP VRBO customer direct booking conversion — instructions provided, in progress</div>
+
+    <div class="cat-label">Tomorrow's focus</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Complete and finalize Q1 report</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Follow up on FFE tenant cancellation and refund processing</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Complete direct booking conversion for AP VRBO customer</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Ensure PP group coordination remains on track</div>
+
+    <div class="cat-label" style="margin-top:1rem">Time allocation · 9.2h</div>
+    <div class="timebar-row"><div class="timebar-label">Guest comms & quotes</div><div class="timebar-track"><div class="timebar-fill" style="width:33%;background:#378ADD"></div></div><span>3h</span></div>
+    <div class="timebar-row"><div class="timebar-label">VRBO/Airbnb resolution</div><div class="timebar-track"><div class="timebar-fill" style="width:43%;background:#1D9E75"></div></div><span>4h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Direct booking & check</div><div class="timebar-track"><div class="timebar-fill" style="width:13%;background:#EF9F27"></div></div><span>1.2h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Coordination</div><div class="timebar-track"><div class="timebar-fill" style="width:10%;background:#888780"></div></div><span>1h</span></div>
+  </div>
+</div>
+
+<div class="person-card">
+  <div class="person-header">
+    <div>
+      <div class="person-name">Antonio Salazar Ancona</div>
+      <div class="person-meta">Reservations · 9.3h logged · <span class="tag-fresh">Today</span> · <a class="view-link" href="#">View Submitted Report →</a></div>
+    </div>
+  </div>
+  <div class="person-body">
+    <div class="cat-label">In progress</div>
+    <div class="subcat">Guest services</div>
+    <div class="task"><div class="bullet"></div>STS pending requirements — all updated today, continuing follow-up tomorrow</div>
+    <div class="task"><div class="bullet"></div>PP Food & Beverage quotes and preference sheets — prepared per guest requests</div>
+    <div class="subcat">Communication</div>
+    <div class="task"><div class="bullet"></div>Reservations inbox — all inquiries addressed, maintaining pace tomorrow</div>
+    <div class="task"><div class="bullet"></div>Guest quote follow-up and active inquiry conversion — monitoring responses</div>
+
+    <div class="cat-label">Tomorrow's focus</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Continue follow-up on all pending STS requirements</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Monitor guest responses and follow up on sent quotes</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Continue PP and FFE quote preparation as requested</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Identify opportunities to convert active inquiries into confirmed bookings</div>
+
+    <div class="cat-label" style="margin-top:1rem">Time allocation · 9.3h</div>
+    <div class="timebar-row"><div class="timebar-label">Email & STS review</div><div class="timebar-track"><div class="timebar-fill" style="width:43%;background:#378ADD"></div></div><span>4h</span></div>
+    <div class="timebar-row"><div class="timebar-label">PP quotes & sheets</div><div class="timebar-track"><div class="timebar-fill" style="width:22%;background:#1D9E75"></div></div><span>2h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Inbox & comms</div><div class="timebar-track"><div class="timebar-fill" style="width:11%;background:#EF9F27"></div></div><span>1h</span></div>
+    <div class="timebar-row"><div class="timebar-label">FFE calls & quotes</div><div class="timebar-track"><div class="timebar-fill" style="width:14%;background:#7F77DD"></div></div><span>1.3h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Break</div><div class="timebar-track"><div class="timebar-fill" style="width:11%;background:#888780"></div></div><span>1h</span></div>
+  </div>
+</div>
+
+<div class="dept-header-bar" style="margin-top:1.5rem">
+  <span class="dept-header-bar-name">💼 Sales</span>
+  <span class="dept-header-bar-status">All reported</span>
+</div>
+
+<div class="person-card">
+  <div class="person-header">
+    <div>
+      <div class="person-name">Isabella (Bella) Zacarias</div>
+      <div class="person-meta">Sales · 5.5h logged · <span class="tag-fresh">Today</span> · <a class="view-link" href="#">View Submitted Report →</a></div>
+    </div>
+  </div>
+  <div class="person-body">
+    <div class="cat-label">Pipeline snapshot</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem">
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">2</div><div style="font-size:11px;color:var(--color-text-secondary)">Hot responsive</div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">61</div><div style="font-size:11px;color:var(--color-text-secondary)">Qualified</div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-warning)">63</div><div style="font-size:11px;color:var(--color-text-secondary)">Hot but cold</div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">5</div><div style="font-size:11px;color:var(--color-text-secondary)">New today</div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">10</div><div style="font-size:11px;color:var(--color-text-secondary)">Contacted</div></div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem;text-align:center"><div style="font-size:20px;font-weight:500;color:var(--color-text-primary)">2</div><div style="font-size:11px;color:var(--color-text-secondary)">Proposals sent</div></div>
+    </div>
+
+    <div class="cat-label">In progress — hot leads</div>
+    <div class="task"><div class="bullet"></div>Laura Kessler — very hot, actively guiding toward commitment and next steps</div>
+    <div class="task"><div class="bullet"></div>Imani Allen — very hot, maintaining momentum toward booking decision</div>
+    <div class="task"><div class="bullet"></div>2 warm groups at decision point — no confirmed timeline yet, positioning for close</div>
+    <div class="task"><div class="warn-icon">⚠</div>Angel Lapointe — budget mismatch ($20k for 2–3 weeks), difficult to reach by phone</div>
+    <div class="task"><div class="warn-icon">⚠</div>63 hot-but-cold leads — qualified for weeks, multiple follow-ups, zero response</div>
+
+    <div class="cat-label">Blocked</div>
+    <div class="task"><div class="block-icon">🚫</div>Retreat leader and personal concierge forms — blocked on travel agent vetting form approval</div>
+
+    <div class="cat-label">Tomorrow's focus</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Continue advancing Laura Kessler and Imani Allen toward deposit</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Get approval on the vetting form</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Send retreat leader and personal concierge forms once approved</div>
+
+    <div class="cat-label" style="margin-top:1rem">Time allocation · 5.5h</div>
+    <div class="timebar-row"><div class="timebar-label">Revenue activities</div><div class="timebar-track"><div class="timebar-fill" style="width:73%;background:#378ADD"></div></div><span>4h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Lead mgmt & CRM</div><div class="timebar-track"><div class="timebar-fill" style="width:18%;background:#1D9E75"></div></div><span>1h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Admin & reporting</div><div class="timebar-track"><div class="timebar-fill" style="width:9%;background:#EF9F27"></div></div><span>0.5h</span></div>
+  </div>
+</div>
+
+<div class="dept-header-bar" style="margin-top:1.5rem">
+  <span class="dept-header-bar-name">🏝 Private Paradise</span>
+  <span class="dept-header-bar-status">All reported</span>
+</div>
+
+<div class="person-card">
+  <div class="person-header">
+    <div>
+      <div class="person-name">Arturo Montes de Oca</div>
+      <div class="person-meta">Private Paradise · Hours not logged · <span class="tag-fresh">Today</span> · <a class="view-link" href="#">View Submitted Report →</a></div>
+    </div>
+  </div>
+  <div class="person-body">
+    <div class="cat-label">In progress — active projects</div>
+    <div class="subcat">Food & beverage</div>
+    <div class="task"><div class="bullet"></div>Vegan & vegetarian menu — vegan complete, starting vegetarian draft<span class="due">· due 4/1</span><span class="pct">50%</span></div>
+    <div class="task"><div class="bullet"></div>Smoothies project — approved by John, waiting on creative team next steps<span class="due od">· was due 3/31</span><span class="pct">90%</span></div>
+    <div class="subcat">Facilities</div>
+    <div class="task"><div class="bullet"></div>Mirrors at Club 33 — 1 of 3 quotes received, sourcing 2 more<span class="due">· due 4/15</span><span class="pct">10%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>Telmex WiFi intensity — line working but not optimal<span class="due od">· was due 3/30</span><span class="pct">80%</span></div>
+    <div class="task"><div class="bullet"></div>Elevator — working to get liftchair refund approved<span class="due">· due 7/1</span><span class="pct">10%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>In-house waterslide sealing — materials received, work pending<span class="due od">· was due 4/10/25</span><span class="pct">70%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>A/C units preventive maintenance units 1–5 — waiting on vacancy<span class="due od">· was due 4/10/25</span><span class="pct">50%</span></div>
+    <div class="subcat">Staff & HR</div>
+    <div class="task"><div class="bullet"></div>Staff vacation conciliation — contracts reviewed, comparing against Adriana's chart<span class="due">· due 4/1</span><span class="pct">70%</span></div>
+    <div class="task"><div class="bullet"></div>Welcome to PP video — continuing until John confirms sufficient content<span class="due od">· was due 3/31</span><span class="pct">90%</span></div>
+    <div class="subcat">Security & operations</div>
+    <div class="task"><div class="warn-icon">⚠</div>PP security cost-saving proposal — never started<span class="due od">· was due 3/31</span><span class="pct">0%</span></div>
+    <div class="task"><div class="warn-icon">⚠</div>Pavers — sourcing 3rd vendor quote per John's request<span class="due od">· was due 3/31</span><span class="pct">25%</span></div>
+
+    <div class="cat-label">Tomorrow's focus</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Supervise Resendiz collecting waterslide screw adjustment data per John's instructions</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Follow up with Scott on smoothies, taxi price comparison, and elevator quotations</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Provide operational support during breakfast and lunch</div>
+    <div class="tmrow-item"><span style="font-size:13px">📅</span>Send photo of the activity board</div>
+
+    <div class="cat-label" style="margin-top:1rem">Time allocation · estimated</div>
+    <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:.5rem;font-style:italic">Hours not logged — estimated from reported activities</div>
+    <div class="timebar-row"><div class="timebar-label">Guest & breakfast ops</div><div class="timebar-track"><div class="timebar-fill" style="width:25%;background:#378ADD"></div></div><span>~2h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Meetings & alignment</div><div class="timebar-track"><div class="timebar-fill" style="width:25%;background:#1D9E75"></div></div><span>~2h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Maintenance & ops</div><div class="timebar-track"><div class="timebar-fill" style="width:37%;background:#EF9F27"></div></div><span>~3h</span></div>
+    <div class="timebar-row"><div class="timebar-label">Admin & payroll</div><div class="timebar-track"><div class="timebar-fill" style="width:12%;background:#888780"></div></div><span>~1h</span></div>
+  </div>
+</div>
+
+<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:.5rem 0;font-size:13px;color:var(--color-text-secondary)">
+  💰 Accounting — reports weekly on Fridays &nbsp;·&nbsp; 📣 Marketing — reports weekly on Fridays &nbsp;·&nbsp; 🎨 Creative/Nova — reports weekly on Fridays
+</div>
+
+<div style="text-align:center;padding:1.5rem 0;border-top:.5px solid var(--color-border-tertiary);margin-top:1rem">
+  <span style="font-size:11px;color:var(--color-text-secondary)">Plaza Properties · Confidential · Generated by OrgRise AI</span>
+</div>
+
+</div>
