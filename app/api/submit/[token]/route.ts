@@ -28,7 +28,8 @@ const ALLOWED_TYPES = [
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_PDF_PAGES = 50;
 
-export const maxDuration = 60;
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 interface Params { params: Promise<{ token: string }> }
 

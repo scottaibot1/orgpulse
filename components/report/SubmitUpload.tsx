@@ -1,7 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, CheckCircle, AlertCircle, FileText, X } from "lucide-react";
+
+const LOADING_MESSAGES = [
+  "Uploading file...",
+  "Extracting content...",
+  "Analyzing with AI...",
+  "Almost done...",
+];
 
 const ACCEPTED = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md";
 const MAX_SIZE_MB = 20;
@@ -18,7 +25,16 @@ export default function SubmitUpload({ token, accentColor }: Props) {
   const [summary, setSummary] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!uploading) { setLoadingMsgIdx(0); return; }
+    const id = setInterval(() => {
+      setLoadingMsgIdx((i) => Math.min(i + 1, LOADING_MESSAGES.length - 1));
+    }, 15000);
+    return () => clearInterval(id);
+  }, [uploading]);
 
   function handleFile(f: File) {
     if (f.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -151,12 +167,12 @@ export default function SubmitUpload({ token, accentColor }: Props) {
         className="w-full py-3 rounded-xl text-white text-sm font-semibold transition-opacity disabled:opacity-50"
         style={{ background: accentColor }}
       >
-        {uploading ? "Processing..." : "Submit Report"}
+        {uploading ? "Processing report... this can take up to 90 seconds" : "Submit Report"}
       </button>
 
       {uploading && (
         <p className="text-xs text-center text-gray-400">
-          Extracting text and running AI analysis — this takes a few seconds...
+          {LOADING_MESSAGES[loadingMsgIdx]}
         </p>
       )}
     </div>
