@@ -218,6 +218,13 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
     return { clean: text.replace(mB[0], "").replace(/\s+/g," ").trim(), dueDate, pct: null };
   }
 
+  // "delayed to 4/20/26" or "- delayed to 4/20/26" — postponement variant
+  const mC = text.match(/\s*(?:[-–—]\s*)?delayed\s+to\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})/i);
+  if (mC) {
+    const dueDate = parseDateStr(mC[1].trim());
+    return { clean: text.replace(mC[0], "").replace(/\s+/g," ").trim(), dueDate, pct: null };
+  }
+
   // (N% complete, due DATE) — e.g. "(50% complete, due Apr 1)"
   const m1 = text.match(/\s*\(\s*(\d{1,3})%\s*(?:complete)?,?\s*due\s+([^)]+?)\s*\)/i);
   if (m1) {
@@ -304,10 +311,11 @@ function groupAttention(items: NeedsAttentionItem[]): Map<string, NeedsAttention
 
 // ── PDF CSS (theme-aware) ──────────────────────────────────────────────────────
 
-function buildPdfCss(c: DesignTokens): string {
+function buildPdfCss(c: DesignTokens, theme: "dark" | "light" = "dark"): string {
   return `
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
+  color-scheme:${theme};
   --color-background-primary:${c.sectionBg};
   --color-background-secondary:${c.sectionBgAlt};
   --color-background-success:${c.bgSuccess};
@@ -392,8 +400,8 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 .tbar-fill{height:4px;border-radius:2px}
 .tbar-h{font-size:12px;color:${c.textTertiary};white-space:nowrap}
 .subcat{font-size:10px;color:${c.textSecondary};text-transform:uppercase;letter-spacing:.05em;margin:8px 0 3px}
-.pct{background:${c.sectionBgAlt};color:${c.textSecondary};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:6px;display:inline-block;white-space:nowrap}
-.due{font-size:11px;color:${c.textTertiary};margin-left:6px;white-space:nowrap}
+.pct{background:${c.accentPrimaryBg};color:${c.accentPrimaryText};font-size:11px;border-radius:10px;padding:2px 6px;margin-left:6px;display:inline-block;white-space:nowrap}
+.due{font-size:11px;color:${c.textSecondary};margin-left:6px;white-space:nowrap}
 .due.od{color:${c.textOverdue};font-weight:500}
 .due.urgent{color:${c.textUrgent};font-weight:500}
 .tmrow-item{display:flex;gap:8px;font-size:13px;color:${c.textSecondary};padding:3px 0;line-height:1.5}
@@ -406,7 +414,7 @@ body{font-family:var(--font-sans);background:${c.pageBodyBg};color:${c.textPrima
 .ptile-label{font-size:11px;color:${c.textSecondary};margin-top:2px}
 .not-expected-bar{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.6rem 1rem;margin:.5rem 0;font-size:13px;color:var(--color-text-secondary)}
 .placeholder{font-size:13px;color:${c.textTertiary};padding:6px 0}
-@media print{@page{margin:10mm 8mm;size:A4;}body{background:${c.pageBodyBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;}.print-btn{display:none!important;}}
+@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}@page{margin:10mm 8mm;size:A4;}body{background:${c.pageBodyBg};}.print-btn{display:none!important;}}
 `.trim();
 }
 
@@ -803,7 +811,7 @@ export function renderPdfHtml(data: AiSummaryData, ctx: RenderContext): string {
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>${orgName} — Executive Summary — ${formattedDate}</title>
-<style>${buildPdfCss(c)}</style>
+<style>${buildPdfCss(c, ctx.theme ?? "dark")}</style>
 </head>
 <body>
 <button class="print-btn" onclick="window.print()" style="position:fixed;top:20px;right:20px;background:${c.buttonBg};color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;z-index:100;">Save as PDF</button>
@@ -859,8 +867,8 @@ function emailTask(h: HighlightItem, e: ES, ctx: RenderContext): string {
     const prefix = st === "overdue" ? "was due " : "due ";
     dueHtml = ` <span class="${className}" style="${style}">· ${prefix}${fmtMD(dueDate, ctx.summaryDate)}</span>`;
   }
-  // ISSUE 1: pct badge with MSO dual-render
-  const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, c.sectionBg, c.textTertiary)}` : "";
+  // pct badge — use accent tint so the pill is visible even on dark section backgrounds
+  const pctHtml = pct != null ? ` ${emailStatusBadgeDual(`${pct}%`, c.accentPrimaryBg, c.accentPrimaryText)}` : "";
 
   if (icon === "warn" || icon === "block") {
     // ISSUE 1 & 4E: badge in separate <td>, using dual-render badge
