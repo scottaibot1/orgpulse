@@ -203,6 +203,21 @@ function extractDuePct(raw: string): { clean: string; dueDate: string | null; pc
   let dueDate: string | null = null;
   let pct: number | null = null;
 
+  // "- 10% complete, due 4/15" — hyphen-separated pct + due
+  const mA = text.match(/\s*[-–—]\s*(\d{1,3})%\s*(?:complete)?,?\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})/i);
+  if (mA) {
+    const pct = parseInt(mA[1], 10);
+    const dueDate = parseDateStr(mA[2].trim());
+    return { clean: text.replace(mA[0], "").replace(/\s+/g," ").trim(), dueDate, pct };
+  }
+
+  // "- due 4/15" — hyphen-separated date only
+  const mB = text.match(/\s*[-–—]\s*due\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{2}-\d{2})/i);
+  if (mB) {
+    const dueDate = parseDateStr(mB[1].trim());
+    return { clean: text.replace(mB[0], "").replace(/\s+/g," ").trim(), dueDate, pct: null };
+  }
+
   // (N% complete, due DATE) — e.g. "(50% complete, due Apr 1)"
   const m1 = text.match(/\s*\(\s*(\d{1,3})%\s*(?:complete)?,?\s*due\s+([^)]+?)\s*\)/i);
   if (m1) {
@@ -899,7 +914,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
     const hrs = estimated ? `~${roundedHrs}h` : `${roundedHrs}h`;
     // ISSUE 8: empty track uses #1e293b (not c.sectionBgAlt)
     return `<tr><td style="padding:2px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-  <td width="140" valign="top" style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-right:8px; padding-top:1px; white-space:nowrap; overflow:hidden; font-family:Arial,Helvetica,sans-serif;">${t.label}</td>
+  <td width="38%" valign="top" style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:${c.textSecondary}; padding-right:8px; padding-top:1px; word-wrap:break-word; overflow-wrap:break-word; font-family:Arial,Helvetica,sans-serif;">${t.label}</td>
   <td valign="middle" style="padding:2px 4px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
       <!--[if mso]>
@@ -911,7 +926,7 @@ function emailTimeBars(alloc: TimeAllocationItem[], estimated: boolean | undefin
       ${rest > 0 ? `<td width="${rest}%" height="8" bgcolor="${c.sectionBgAlt}" style="background-color:${c.sectionBgAlt}; font-size:1px; line-height:1px;">&nbsp;</td>` : ""}
     </tr></table>
   </td>
-  <td width="50" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:${c.textSecondary}; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
+  <td width="14%" valign="top" style="font-size:11px; line-height:16px; mso-line-height-rule:exactly; font-family:Arial,Helvetica,sans-serif; color:${c.textSecondary}; text-align:right; vertical-align:middle; padding-left:8px; white-space:nowrap;">${hrs}</td>
 </tr></table></td></tr>`;
   }).join("");
 
